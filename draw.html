@@ -8,11 +8,11 @@
     body { margin: 0; background-color: #fce4ec; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
     
     /* ツールバーのデザイン */
-    .toolbar { background: #fff; padding: 10px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 10; }
+    .toolbar { background: #fff; padding: 10px; display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 10; }
     .tool-group { display: flex; align-items: center; gap: 5px; background: #f5f5f5; padding: 5px 12px; border-radius: 25px; }
     
     input[type="color"] { width: 40px; height: 40px; border: none; cursor: pointer; background: none; padding: 0; }
-    input[type="range"] { width: 80px; cursor: pointer; }
+    input[type="range"] { width: 70px; cursor: pointer; }
     
     button { font-size: 0.95rem; padding: 8px 14px; border-radius: 20px; border: none; cursor: pointer; font-weight: bold; transition: 0.1s; }
     button:active { transform: scale(0.95); }
@@ -23,6 +23,7 @@
     .btn-pen { background: #333; color: #fff; }
     .btn-fill { background: #ff9800; color: #fff; }
     .btn-eraser { background: #cfd8dc; color: #333; }
+    .btn-undo { background: #9c27b0; color: #fff; }
     .btn-clear { background: #ff5252; color: #fff; }
     .btn-send { background: #4caf50; color: #fff; font-size: 1.1rem; padding: 10px 20px; box-shadow: 0 4px 6px rgba(76, 175, 80, 0.3); border-radius: 30px; }
 
@@ -36,6 +37,7 @@
       max-width: 100%; 
       max-height: 100%; 
       object-fit: contain;
+      cursor: crosshair; /* 初期カーソル */
     }
   </style>
 </head>
@@ -50,6 +52,7 @@
       <button id="btnPen" class="btn-pen active" onclick="setMode('pen')">ペン</button>
       <button id="btnFill" class="btn-fill" onclick="setMode('fill')">塗りつぶし</button>
       <button id="btnEraser" class="btn-eraser" onclick="setMode('eraser')">消しゴム</button>
+      <button class="btn-undo" onclick="undo()">↩️ もどす</button>
       <button class="btn-clear" onclick="clearCanvas()">ぜんぶ消す</button>
     </div>
     <button class="btn-send" onclick="sendDrawing()">🚀 送信！</button>
@@ -84,9 +87,30 @@
     const sizePicker = document.getElementById('sizePicker');
     
     let drawing = false;
-    let mode = 'pen'; // 'pen', 'fill', 'eraser'
+    let mode = 'pen';
 
-    // ツールボタンのモード切替
+    // ツールごとのカスタムカーソル定義（ペンキバケツのSVG）
+    const bucketCursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="%23ff9800" stroke="%23333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2a2 2 0 0 0 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/></svg>') 2 28, auto`;
+
+    // 履歴（Undo）管理
+    const historyStack = [];
+    const MAX_HISTORY = 15;
+
+    function saveState() {
+      if (historyStack.length >= MAX_HISTORY) {
+        historyStack.shift();
+      }
+      historyStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+    }
+
+    window.undo = function() {
+      if (historyStack.length > 0) {
+        const previousState = historyStack.pop();
+        ctx.putImageData(previousState, 0, 0);
+      }
+    };
+
+    // ツールボタンのモード切替 ＋ カーソルの切り替え
     window.setMode = function(newMode) {
       mode = newMode;
       document.getElementById('btnPen').classList.remove('active');
@@ -96,12 +120,15 @@
       if (mode === 'pen') {
         ctx.globalCompositeOperation = 'source-over';
         document.getElementById('btnPen').classList.add('active');
+        canvas.style.cursor = 'crosshair'; // ペン（十字カーソル）
       } else if (mode === 'fill') {
         ctx.globalCompositeOperation = 'source-over';
         document.getElementById('btnFill').classList.add('active');
+        canvas.style.cursor = bucketCursor; // ★ ペンキバケツマーク
       } else if (mode === 'eraser') {
         ctx.globalCompositeOperation = 'destination-out';
         document.getElementById('btnEraser').classList.add('active');
+        canvas.style.cursor = 'cell'; // 消しゴム（四角枠カーソル）
       }
     };
 
@@ -120,10 +147,11 @@
 
     const start = (e) => { 
       e.preventDefault(); 
+      saveState();
+
       const pos = getPos(e);
 
       if (mode === 'fill') {
-        // 塗りつぶしモードの場合は即座にバケツ処理を実行
         floodFill(pos.x, pos.y, colorPicker.value);
       } else {
         drawing = true; 
@@ -160,10 +188,11 @@
     canvas.addEventListener('touchmove', draw, {passive: false});
 
     window.clearCanvas = function() {
+      saveState();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     };
 
-    // 塗りつぶし（Flood Fill）アルゴリズム
+    // 塗りつぶし（Flood Fill）
     function floodFill(startX, startY, fillColorHex) {
       startX = Math.floor(startX);
       startY = Math.floor(startY);
@@ -179,20 +208,18 @@
       const startB = data[startPos + 2];
       const startA = data[startPos + 3];
 
-      // Hex色コードをRGBAに変換
       const fillR = parseInt(fillColorHex.slice(1, 3), 16);
       const fillG = parseInt(fillColorHex.slice(3, 5), 16);
       const fillB = parseInt(fillColorHex.slice(5, 7), 16);
       const fillA = 255;
 
-      // クリック箇所が既に同じ色なら何もしない
       if (Math.abs(startR - fillR) < 10 && 
           Math.abs(startG - fillG) < 10 && 
           Math.abs(startB - fillB) < 10 && 
           Math.abs(startA - fillA) < 10) return;
 
       const pixelStack = [[startX, startY]];
-      const tolerance = 40; // 線の境界線の滲みを許容する許容値
+      const tolerance = 40;
 
       function matchStartColor(pos) {
         const r = data[pos];
