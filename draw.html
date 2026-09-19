@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>お絵描き送信画面</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: #fff9c4;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 1.5rem;
+      color: #333;
+    }
+    canvas {
+      background: #ffffff;
+      border: 3px solid #ff9800;
+      border-radius: 12px;
+      touch-action: none; /* スマホでのスクロールを防ぐ */
+      max-width: 100%;
+    }
+    .controls {
+      margin-top: 15px;
+    }
+    button {
+      font-size: 1.2rem;
+      font-weight: bold;
+      padding: 12px 24px;
+      margin: 5px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-clear { background: #e0e0e0; color: #333; }
+    .btn-send { background: #ff4757; color: #fff; }
+  </style>
+</head>
+<body>
+  <h1>すきなえをかいてね！</h1>
+  <canvas id="canvas" width="350" height="350"></canvas>
+  <div class="controls">
+    <button class="btn-clear" onclick="clearCanvas()">やり直し</button>
+    <button class="btn-send" id="sendBtn">送信！</button>
+  </div>
+
+  <!-- Firebaseの設定と送信処理 -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // ▼▼▼ ここを自分のFirebaseの設定に書き換えます ▼▼▼
+    const firebaseConfig = {
+    apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
+    authDomain: "espu9owen.firebaseapp.com",
+    databaseURL: "https://espu9owen-default-rtdb.firebaseio.com",
+    projectId: "espu9owen",
+    storageBucket: "espu9owen.firebasestorage.app",
+    messagingSenderId: "1003969526788",
+    appId: "1:1003969526788:web:00a61b5a0cc2281de54951",
+    measurementId: "G-GLW0L4Y53H"
+    };
+  // ▲▲▲ ここまで ▲▲▲
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // キャンバスの描画処理
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+
+    const start = (e) => { drawing = true; draw(e); };
+    const end = () => { drawing = false; ctx.beginPath(); };
+    const draw = (e) => {
+      if (!drawing) return;
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+      ctx.lineWidth = 8;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#333333';
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    };
+
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mouseup', end);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('touchstart', start, { passive: false });
+    canvas.addEventListener('touchend', end);
+    canvas.addEventListener('touchmove', draw, { passive: false });
+
+    // グローバルに関数を公開（ボタンのonclickで呼ぶため）
+    window.clearCanvas = function() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+
+    // 送信ボタンの処理
+    document.getElementById('sendBtn').addEventListener('click', () => {
+      const dataURL = canvas.toDataURL();
+      // Firebaseに絵のデータを送信
+      push(ref(db, 'art_stream'), { dataURL: dataURL, timestamp: Date.now() })
+        .then(() => {
+          alert('えをおくったよ！');
+          window.clearCanvas();
+        })
+        .catch((error) => {
+          console.error("エラーが発生しました: ", error);
+          alert('そうしんにしっぱいしました');
+        });
+    });
+  </script>
+</body>
+</html>

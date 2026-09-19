@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>みんなの絵の広場</title>
+  <style>
+    body { 
+      margin: 0; 
+      overflow: hidden; 
+      background: linear-gradient(to bottom, #87CEEB, #E0F6FF); 
+      height: 100vh; 
+    }
+    .art-item {
+      position: absolute;
+      width: 200px;
+      /* 2.5秒かけて移動する設定 */
+      transition: all 2.5s ease-in-out; 
+      filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.2));
+    }
+    /* 遠くに消えていくアニメーション */
+    .fly-away {
+      /* 3秒かけて小さくなりながら回転して消える */
+      transition: all 3s ease-in !important;
+      transform: translate(150vw, -150vh) scale(0.01) rotate(1080deg) !important;
+      opacity: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+
+  <!-- Firebaseの設定と受信処理 -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, onChildAdded, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // ▼▼▼ draw.htmlと同じFirebaseの設定に書き換えます ▼▼▼
+    const firebaseConfig = {
+    apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
+    authDomain: "espu9owen.firebaseapp.com",
+    databaseURL: "https://espu9owen-default-rtdb.firebaseio.com",
+    projectId: "espu9owen",
+    storageBucket: "espu9owen.firebasestorage.app",
+    messagingSenderId: "1003969526788",
+    appId: "1:1003969526788:web:00a61b5a0cc2281de54951",
+    measurementId: "G-GLW0L4Y53H"
+    };
+    // ▲▲▲ ここまで ▲▲▲
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // 新しい絵が追加された時の処理
+    onChildAdded(ref(db, 'art_stream'), (snapshot) => {
+      const data = snapshot.val();
+      
+      // 1. 絵を画面に出現させて動かす
+      if (data && data.dataURL) {
+        createFloatingArt(data.dataURL);
+      }
+
+      // 2. 受け取ったらすぐにFirebase上のデータを削除（容量節約）
+      remove(snapshot.ref).catch(error => console.error("削除エラー:", error));
+    });
+
+    // 絵を動かす関数
+    function createFloatingArt(dataURL) {
+      const img = document.createElement('img');
+      img.src = dataURL;
+      img.className = 'art-item';
+      
+      // 初期位置（画面の中央付近）
+      let currentX = window.innerWidth / 2 - 100;
+      let currentY = window.innerHeight / 2 - 100;
+      img.style.left = `${currentX}px`;
+      img.style.top = `${currentY}px`;
+      document.getElementById('stage').appendChild(img);
+
+      // 2.5秒ごとに画面内をランダムに移動
+      const moveTimer = setInterval(() => {
+        currentX = Math.random() * (window.innerWidth - 200);
+        currentY = Math.random() * (window.innerHeight - 200);
+        img.style.left = `${currentX}px`;
+        img.style.top = `${currentY}px`;
+      }, 2500);
+
+      // 60秒後に遠くへ移動して消滅
+      setTimeout(() => {
+        clearInterval(moveTimer);
+        img.classList.add('fly-away');
+        // アニメーションが終わる頃（3秒後）にHTMLから完全に削除
+        setTimeout(() => img.remove(), 3000); 
+      }, 60000);
+    }
+  </script>
+</body>
+</html>
