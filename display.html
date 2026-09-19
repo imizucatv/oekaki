@@ -2,24 +2,70 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>みんなの絵の広場</title>
+  <title>みんなの水族館</title>
   <style>
-    /* 画面全体を広場の背景にする */
+    /* 全体と海の中のグラデーション背景 */
     body { 
       margin: 0; 
       overflow: hidden; 
-      background: #e0f7fa; 
-      background-image: radial-gradient(#b2ebf2 2px, transparent 2px);
-      background-size: 40px 40px;
       height: 100vh; 
       width: 100vw;
+      background: linear-gradient(180deg, #81d4fa 0%, #0288d1 70%, #01579b 100%);
+      position: relative;
+      font-family: sans-serif;
     }
-    
+
+    /* 海の光のすじ */
+    .sunbeams {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(
+        110deg,
+        rgba(255, 255, 255, 0.12) 0px,
+        rgba(255, 255, 255, 0.12) 40px,
+        transparent 40px,
+        transparent 100px
+      );
+      pointer-events: none;
+    }
+
+    /* ふわふわ浮かぶ泡のアニメーション */
+    .bubble {
+      position: absolute;
+      bottom: -50px;
+      background: rgba(255, 255, 255, 0.3);
+      border: 2px solid rgba(255, 255, 255, 0.6);
+      border-radius: 50%;
+      animation: floatUp linear infinite;
+      pointer-events: none;
+    }
+
+    @keyframes floatUp {
+      0% { transform: translateY(0) scale(0.8); opacity: 0.8; }
+      50% { transform: translateY(-50vh) scale(1.1); }
+      100% { transform: translateY(-105vh) scale(1); opacity: 0; }
+    }
+
+    /* 海底のイラスト（サンゴ・水草・砂地） */
+    .seabed-container {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      height: 160px;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* お絵描きの絵（浮遊感のある影付き） */
     .art-item {
       position: absolute;
-      max-width: 250px;
-      max-height: 250px;
-      /* 動きをなめらかにする設定 */
+      max-width: 240px;
+      max-height: 240px;
+      z-index: 10;
+      filter: drop-shadow(0px 8px 12px rgba(0,0,0,0.25));
       transition: left 2.5s ease-in-out, top 2.5s ease-in-out, transform 3s ease-in, opacity 3s ease-in;
     }
     
@@ -31,33 +77,80 @@
   </style>
 </head>
 <body>
-  
+
+  <!-- 光の演出 -->
+  <div class="sunbeams"></div>
+
+  <!-- 泡（JSで自動発生） -->
+  <div id="bubbles-container"></div>
+
+  <!-- 海底の可愛いイラスト（SVG） -->
+  <div class="seabed-container">
+    <svg viewBox="0 0 1200 160" preserveAspectRatio="none" style="width: 100%; height: 100%;">
+      <!-- 砂地 -->
+      <path d="M0,160 L0,120 Q200,90 400,110 T800,100 T1200,110 L1200,160 Z" fill="#ffe082"/>
+      
+      <!-- ピンクのサンゴ -->
+      <path d="M150,130 Q140,90 155,80 Q165,70 170,85 Q180,65 195,75 Q205,85 195,100 Q210,110 200,130 Z" fill="#ff80ab"/>
+      <circle cx="155" cy="80" r="8" fill="#ff80ab"/>
+      <circle cx="170" cy="85" r="9" fill="#ff80ab"/>
+      <circle cx="195" cy="75" r="8" fill="#ff80ab"/>
+
+      <!-- 水草（左） -->
+      <path d="M80,140 Q60,90 85,40 Q75,90 95,140" stroke="#66bb6a" stroke-width="12" stroke-linecap="round" fill="none"/>
+      <path d="M100,140 Q120,80 95,30 Q110,80 110,140" stroke="#81c784" stroke-width="10" stroke-linecap="round" fill="none"/>
+
+      <!-- オレンジのサンゴ -->
+      <path d="M1000,135 Q980,100 990,85 Q1005,75 1010,95 Q1025,80 1035,90 Q1040,105 1030,135 Z" fill="#ffb74d"/>
+
+      <!-- 水草（右） -->
+      <path d="M1080,140 Q1100,80 1070,30 Q1090,80 1095,140" stroke="#4caf50" stroke-width="12" stroke-linecap="round" fill="none"/>
+      <path d="M1060,140 Q1040,90 1055,50 Q1050,90 1070,140" stroke="#81c784" stroke-width="8" stroke-linecap="round" fill="none"/>
+
+      <!-- ヒトデ -->
+      <polygon points="500,135 505,145 515,145 507,152 510,160 500,155 490,160 493,152 485,145 495,145" fill="#ff7043"/>
+    </svg>
+  </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, onChildAdded, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     // ▼▼▼ あなたのFirebase設定に書き換えてください ▼▼▼
     const firebaseConfig = {
-    apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
-    authDomain: "espu9owen.firebaseapp.com",
-    databaseURL: "https://espu9owen-default-rtdb.firebaseio.com",
-    projectId: "espu9owen",
-    storageBucket: "espu9owen.firebasestorage.app",
-    messagingSenderId: "1003969526788",
-    appId: "1:1003969526788:web:00a61b5a0cc2281de54951",
-    measurementId: "G-GLW0L4Y53H"
+      apiKey: "YOUR_API_KEY",
+      databaseURL: "https://YOUR_PROJECT_ID.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID"
     };
     // ▲▲▲ ここまで ▲▲▲
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
+    // 泡を自動生成する演出
+    const bubblesContainer = document.getElementById('bubbles-container');
+    function createBubble() {
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      const size = Math.random() * 20 + 10; // 10px〜30px
+      bubble.style.width = `${size}px`;
+      bubble.style.height = `${size}px`;
+      bubble.style.left = `${Math.random() * 100}vw`;
+      bubble.style.animationDuration = `${Math.random() * 5 + 5}s`; // 5s〜10sかけて上昇
+      bubblesContainer.appendChild(bubble);
+
+      setTimeout(() => {
+        bubble.remove();
+      }, 10000);
+    }
+    setInterval(createBubble, 800); // 0.8秒ごとに泡を発生
+
     // 新しい絵が届いたときの処理
     onChildAdded(ref(db, 'art_stream'), (snapshot) => {
       const data = snapshot.val();
       createFloatingArt(data.dataURL);
       
-      // 受信直後にFirebase上のデータだけ削除（自動お掃除）
+      // 受信直後にFirebase上のデータだけ削除
       remove(snapshot.ref);
     });
 
@@ -68,46 +161,37 @@
       img.className = 'art-item';
       document.body.appendChild(img);
 
-      // 画像が読み込まれてサイズが確定したら動き始める
       img.onload = () => {
         // 初期位置は画面の中央付近
         img.style.left = `${window.innerWidth / 2 - img.width / 2}px`;
         img.style.top = `${window.innerHeight / 2 - img.height / 2}px`;
 
-        // ランダムに動かす関数（現在の画面サイズを基準にするため可変対応）
+        // ランダムに遊泳させる関数
         const move = () => {
-          // 画面外にはみ出さないよう、現在のウィンドウ幅から画像の幅を引く
           const maxX = window.innerWidth - img.width;
-          const maxY = window.innerHeight - img.height;
+          const maxY = window.innerHeight - img.height - 100; // 海底のイラストと被りすぎない高さに調整
           
-          // 0 〜 最大値 の間でランダムな座標を計算
           const nextX = Math.max(0, Math.random() * maxX);
-          const nextY = Math.max(0, Math.random() * maxY);
+          const nextY = Math.max(40, Math.random() * maxY); // 水面〜中層付近をゆらゆら動く
           
           img.style.left = `${nextX}px`;
           img.style.top = `${nextY}px`;
         };
 
-        // 最初の動きを少し遅らせて開始
         setTimeout(move, 100);
-
-        // 2.5秒ごとに次の目的地へ移動
         const moveTimer = setInterval(move, 2500);
 
         // 120秒（2分）後に消滅させる処理
         setTimeout(() => {
           clearInterval(moveTimer);
           
-          // 画面外に飛ばすアニメーションを追加
           img.classList.add('fly-away');
-          // はるか遠くへ飛ばす（画面サイズに依存させない）
           img.style.left = `${window.innerWidth + 500}px`;
           img.style.top = `-500px`;
 
-          // アニメーションが終わる3秒後に、HTMLから完全に削除
           setTimeout(() => img.remove(), 3000);
           
-        }, 120000); // 120000ミリ秒 ＝ 2分
+        }, 120000); // 2分
       };
     }
   </script>
