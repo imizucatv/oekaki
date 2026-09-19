@@ -4,37 +4,39 @@
   <meta charset="UTF-8">
   <title>みんなの絵の広場</title>
   <style>
+    /* 画面全体を広場の背景にする */
     body { 
       margin: 0; 
       overflow: hidden; 
-      background: linear-gradient(to bottom, #87CEEB, #E0F6FF); 
+      background: #e0f7fa; 
+      background-image: radial-gradient(#b2ebf2 2px, transparent 2px);
+      background-size: 40px 40px;
       height: 100vh; 
+      width: 100vw;
     }
+    
     .art-item {
       position: absolute;
-      width: 200px;
-      /* 2.5秒かけて移動する設定 */
-      transition: all 2.5s ease-in-out; 
-      filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.2));
+      max-width: 250px;
+      max-height: 250px;
+      /* 動きをなめらかにする設定 */
+      transition: left 2.5s ease-in-out, top 2.5s ease-in-out, transform 3s ease-in, opacity 3s ease-in;
     }
-    /* 遠くに消えていくアニメーション */
+    
+    /* 2分後に遠くに消えていくアニメーション */
     .fly-away {
-      /* 3秒かけて小さくなりながら回転して消える */
-      transition: all 3s ease-in !important;
-      transform: translate(150vw, -150vh) scale(0.01) rotate(1080deg) !important;
       opacity: 0;
+      transform: scale(0.01) rotate(1080deg) !important;
     }
   </style>
 </head>
 <body>
-  <div id="stage"></div>
-
-  <!-- Firebaseの設定と受信処理 -->
+  
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, onChildAdded, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // ▼▼▼ draw.htmlと同じFirebaseの設定に書き換えます ▼▼▼
+    // ▼▼▼ あなたのFirebase設定に書き換えてください ▼▼▼
     const firebaseConfig = {
     apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
     authDomain: "espu9owen.firebaseapp.com",
@@ -50,47 +52,63 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // 新しい絵が追加された時の処理
+    // 新しい絵が届いたときの処理
     onChildAdded(ref(db, 'art_stream'), (snapshot) => {
       const data = snapshot.val();
+      createFloatingArt(data.dataURL);
       
-      // 1. 絵を画面に出現させて動かす
-      if (data && data.dataURL) {
-        createFloatingArt(data.dataURL);
-      }
-
-      // 2. 受け取ったらすぐにFirebase上のデータを削除（容量節約）
-      remove(snapshot.ref).catch(error => console.error("削除エラー:", error));
+      // 受信直後にFirebase上のデータだけ削除（自動お掃除）
+      remove(snapshot.ref);
     });
 
-    // 絵を動かす関数
+    // 絵を画面に出して動かす関数
     function createFloatingArt(dataURL) {
       const img = document.createElement('img');
       img.src = dataURL;
       img.className = 'art-item';
-      
-      // 初期位置（画面の中央付近）
-      let currentX = window.innerWidth / 2 - 100;
-      let currentY = window.innerHeight / 2 - 100;
-      img.style.left = `${currentX}px`;
-      img.style.top = `${currentY}px`;
-      document.getElementById('stage').appendChild(img);
+      document.body.appendChild(img);
 
-      // 2.5秒ごとに画面内をランダムに移動
-      const moveTimer = setInterval(() => {
-        currentX = Math.random() * (window.innerWidth - 200);
-        currentY = Math.random() * (window.innerHeight - 200);
-        img.style.left = `${currentX}px`;
-        img.style.top = `${currentY}px`;
-      }, 2500);
+      // 画像が読み込まれてサイズが確定したら動き始める
+      img.onload = () => {
+        // 初期位置は画面の中央付近
+        img.style.left = `${window.innerWidth / 2 - img.width / 2}px`;
+        img.style.top = `${window.innerHeight / 2 - img.height / 2}px`;
 
-      // 60秒後に遠くへ移動して消滅
-      setTimeout(() => {
-        clearInterval(moveTimer);
-        img.classList.add('fly-away');
-        // アニメーションが終わる頃（3秒後）にHTMLから完全に削除
-        setTimeout(() => img.remove(), 3000); 
-      }, 60000);
+        // ランダムに動かす関数（現在の画面サイズを基準にするため可変対応）
+        const move = () => {
+          // 画面外にはみ出さないよう、現在のウィンドウ幅から画像の幅を引く
+          const maxX = window.innerWidth - img.width;
+          const maxY = window.innerHeight - img.height;
+          
+          // 0 〜 最大値 の間でランダムな座標を計算
+          const nextX = Math.max(0, Math.random() * maxX);
+          const nextY = Math.max(0, Math.random() * maxY);
+          
+          img.style.left = `${nextX}px`;
+          img.style.top = `${nextY}px`;
+        };
+
+        // 最初の動きを少し遅らせて開始
+        setTimeout(move, 100);
+
+        // 2.5秒ごとに次の目的地へ移動
+        const moveTimer = setInterval(move, 2500);
+
+        // 120秒（2分）後に消滅させる処理
+        setTimeout(() => {
+          clearInterval(moveTimer);
+          
+          // 画面外に飛ばすアニメーションを追加
+          img.classList.add('fly-away');
+          // はるか遠くへ飛ばす（画面サイズに依存させない）
+          img.style.left = `${window.innerWidth + 500}px`;
+          img.style.top = `-500px`;
+
+          // アニメーションが終わる3秒後に、HTMLから完全に削除
+          setTimeout(() => img.remove(), 3000);
+          
+        }, 120000); // 120000ミリ秒 ＝ 2分
+      };
     }
   </script>
 </body>

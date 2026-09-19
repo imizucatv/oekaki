@@ -2,57 +2,63 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>お絵描き送信画面</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>お絵描きアプリ</title>
   <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      background: #fff9c4;
-      margin: 0;
-      padding: 20px;
+    body { margin: 0; background-color: #fce4ec; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    
+    /* ツールバーのデザイン */
+    .toolbar { background: #fff; padding: 10px; display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 10; }
+    .tool-group { display: flex; align-items: center; gap: 5px; background: #f5f5f5; padding: 5px 15px; border-radius: 25px; }
+    
+    input[type="color"] { width: 40px; height: 40px; border: none; cursor: pointer; background: none; padding: 0; }
+    input[type="range"] { width: 100px; cursor: pointer; }
+    
+    button { font-size: 1rem; padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; font-weight: bold; transition: 0.1s; }
+    button:active { transform: scale(0.95); }
+    .btn-pen { background: #333; color: #fff; }
+    .btn-eraser { background: #cfd8dc; color: #333; }
+    .btn-clear { background: #ff5252; color: #fff; }
+    .btn-send { background: #4caf50; color: #fff; font-size: 1.2rem; padding: 10px 24px; box-shadow: 0 4px 6px rgba(76, 175, 80, 0.3); border-radius: 30px; }
+
+    /* キャンバス部分 */
+    .canvas-wrapper { flex: 1; display: flex; justify-content: center; align-items: center; padding: 15px; box-sizing: border-box; }
+    canvas { 
+      background-color: white; /* 見た目は白ですが、データとしては透明になります */
+      border-radius: 12px; 
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+      touch-action: none; 
+      max-width: 100%; 
+      max-height: 100%; 
+      object-fit: contain;
     }
-    h1 {
-      font-size: 1.5rem;
-      color: #333;
-    }
-    canvas {
-      background: #ffffff;
-      border: 3px solid #ff9800;
-      border-radius: 12px;
-      touch-action: none; /* スマホでのスクロールを防ぐ */
-      max-width: 100%;
-    }
-    .controls {
-      margin-top: 15px;
-    }
-    button {
-      font-size: 1.2rem;
-      font-weight: bold;
-      padding: 12px 24px;
-      margin: 5px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-    .btn-clear { background: #e0e0e0; color: #333; }
-    .btn-send { background: #ff4757; color: #fff; }
   </style>
 </head>
 <body>
-  <h1>すきなえをかいてね！</h1>
-  <canvas id="canvas" width="350" height="350"></canvas>
-  <div class="controls">
-    <button class="btn-clear" onclick="clearCanvas()">やり直し</button>
-    <button class="btn-send" id="sendBtn">送信！</button>
+
+  <div class="toolbar">
+    <div class="tool-group">
+      <input type="color" id="colorPicker" value="#ff0000">
+      <input type="range" id="sizePicker" min="2" max="40" value="8">
+    </div>
+    <div class="tool-group">
+      <button class="btn-pen" onclick="setMode('pen')">ペン</button>
+      <button class="btn-eraser" onclick="setMode('eraser')">消しゴム</button>
+      <button class="btn-clear" onclick="clearCanvas()">ぜんぶ消す</button>
+    </div>
+    <button class="btn-send" onclick="sendDrawing()">🚀 送信！</button>
   </div>
 
-  <!-- Firebaseの設定と送信処理 -->
+  <div class="canvas-wrapper">
+    <!-- 解像度は高めに設定し、CSSで画面サイズに合わせて縮小表示させます -->
+    <canvas id="canvas" width="800" height="600"></canvas>
+  </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // ▼▼▼ ここを自分のFirebaseの設定に書き換えます ▼▼▼
+    // ▼▼▼ あなたのFirebase設定に書き換えてください ▼▼▼
     const firebaseConfig = {
     apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
     authDomain: "espu9owen.firebaseapp.com",
@@ -63,59 +69,93 @@
     appId: "1:1003969526788:web:00a61b5a0cc2281de54951",
     measurementId: "G-GLW0L4Y53H"
     };
-  // ▲▲▲ ここまで ▲▲▲
+    // ▲▲▲ ここまで ▲▲▲
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // キャンバスの描画処理
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
+    const colorPicker = document.getElementById('colorPicker');
+    const sizePicker = document.getElementById('sizePicker');
+    
     let drawing = false;
+    let mode = 'pen'; // 'pen' or 'eraser'
 
-    const start = (e) => { drawing = true; draw(e); };
-    const end = () => { drawing = false; ctx.beginPath(); };
+    // ペンと消しゴムの切り替え（透明な背景を維持するため、消しゴムは画像を削る処理にします）
+    window.setMode = function(newMode) {
+      mode = newMode;
+      if (mode === 'pen') {
+        ctx.globalCompositeOperation = 'source-over';
+      } else {
+        ctx.globalCompositeOperation = 'destination-out';
+      }
+    };
+
+    // 描画処理
+    const getPos = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      // キャンバスの表示サイズと実際の解像度の比率を計算して座標を補正
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+      };
+    };
+
+    const start = (e) => { 
+      e.preventDefault(); 
+      drawing = true; 
+      draw(e); 
+    };
+    
+    const end = () => { 
+      drawing = false; 
+      ctx.beginPath(); 
+    };
+    
     const draw = (e) => {
       if (!drawing) return;
       e.preventDefault();
-      const rect = canvas.getBoundingClientRect();
-      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-      const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-      ctx.lineWidth = 8;
+      const pos = getPos(e);
+      
+      ctx.lineWidth = sizePicker.value;
       ctx.lineCap = 'round';
-      ctx.strokeStyle = '#333333';
-      ctx.lineTo(x, y);
+      ctx.lineJoin = 'round';
+      
+      // 消しゴムモードの時は色は関係なし（透明になる）
+      ctx.strokeStyle = mode === 'pen' ? colorPicker.value : "rgba(0,0,0,1)";
+      
+      ctx.lineTo(pos.x, pos.y);
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(x, y);
+      ctx.moveTo(pos.x, pos.y);
     };
 
     canvas.addEventListener('mousedown', start);
     canvas.addEventListener('mouseup', end);
     canvas.addEventListener('mousemove', draw);
-    canvas.addEventListener('touchstart', start, { passive: false });
+    canvas.addEventListener('touchstart', start, {passive: false});
     canvas.addEventListener('touchend', end);
-    canvas.addEventListener('touchmove', draw, { passive: false });
+    canvas.addEventListener('touchmove', draw, {passive: false});
 
-    // グローバルに関数を公開（ボタンのonclickで呼ぶため）
     window.clearCanvas = function() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     };
 
-    // 送信ボタンの処理
-    document.getElementById('sendBtn').addEventListener('click', () => {
-      const dataURL = canvas.toDataURL();
-      // Firebaseに絵のデータを送信
-      push(ref(db, 'art_stream'), { dataURL: dataURL, timestamp: Date.now() })
-        .then(() => {
-          alert('えをおくったよ！');
-          window.clearCanvas();
-        })
-        .catch((error) => {
-          console.error("エラーが発生しました: ", error);
-          alert('そうしんにしっぱいしました');
-        });
-    });
+    // 送信処理
+    window.sendDrawing = function() {
+      // 完全に白紙の場合は送信しない簡易チェック（必要に応じて）
+      const dataURL = canvas.toDataURL("image/png");
+      push(ref(db, 'art_stream'), { dataURL: dataURL, createdAt: Date.now() });
+      
+      // 送信後はキャンバスをリセット
+      clearCanvas();
+      alert("えを そうしんしたよ！");
+    };
   </script>
 </body>
 </html>
