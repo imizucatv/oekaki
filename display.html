@@ -2,17 +2,30 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>みんなの水族館</title>
+
+  <!-- ★ アプリ化（フルスクリーン化）用の設定 ★ -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="みんなの水族館">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#e1f5fe">
+
   <style>
-    /* 全体と海の中のグラデーション背景（薄いパステル水色） */
-    body { 
+    /* 全体と海の中のグラデーション背景 */
+    html, body { 
       margin: 0; 
+      padding: 0;
       overflow: hidden; 
       height: 100vh; 
+      height: 100dvh;
       width: 100vw;
       background: linear-gradient(180deg, #e1f5fe 0%, #b3e5fc 50%, #4fc3f7 100%);
       position: relative;
       font-family: sans-serif;
+      overscroll-behavior: none;
+      user-select: none;
     }
 
     /* 海の光のすじ */
@@ -64,29 +77,25 @@
       position: absolute;
       z-index: 10;
       pointer-events: none;
-      /* 移動のイージングを魚らしい滑らかさに設定 */
       transition: left 3s cubic-bezier(0.25, 1, 0.5, 1), top 3s cubic-bezier(0.25, 1, 0.5, 1);
     }
     
     /* 魚自体のビジュアルと「ゆらゆら運動」 */
     .art-body {
-      max-width: 350px;  /* ★ ご指定の350pxサイズ */
+      max-width: 350px;
       max-height: 350px;
       filter: drop-shadow(0px 8px 12px rgba(0,0,0,0.2));
-      /* 常にふわふわ揺れるアニメーション */
       animation: swimWiggle 2.5s ease-in-out infinite alternate;
       transition: transform 0.8s ease-out, opacity 3s ease-in;
       transform-origin: center center;
     }
 
-    /* 水中で波打つ動き */
     @keyframes swimWiggle {
       0% { transform: translateY(0px) rotate(-2deg); }
       50% { transform: translateY(-10px) rotate(3deg); }
       100% { transform: translateY(5px) rotate(-1deg); }
     }
     
-    /* 2分後に遠くに退場するアニメーション */
     .fly-away .art-body {
       opacity: 0;
       transform: scale(0.01) rotate(1080deg) !important;
@@ -101,7 +110,7 @@
   <!-- 泡 -->
   <div id="bubbles-container"></div>
 
-  <!-- 海底の可愛いイラスト（SVG） -->
+  <!-- 海底のイラスト（SVG） -->
   <div class="seabed-container">
     <svg viewBox="0 0 1200 160" preserveAspectRatio="none" style="width: 100%; height: 100%;">
       <path d="M0,160 L0,120 Q200,90 400,110 T800,100 T1200,110 L1200,160 Z" fill="#ffe082"/>
@@ -122,7 +131,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, onChildAdded, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // Firebase設定[cite: 1, 2]
     const firebaseConfig = {
       apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
       authDomain: "espu9owen.firebaseapp.com",
@@ -136,6 +144,17 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+
+    // ★ 画面上をダブルクリック（またはタップ）でフルスクリーン切り替え ★
+    document.body.addEventListener('dblclick', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    });
 
     // 泡の自動生成
     const bubblesContainer = document.getElementById('bubbles-container');
@@ -180,7 +199,6 @@
 
         let moveTimer = null;
 
-        // 魚の泳ぎロジック
         const swim = () => {
           const maxX = Math.max(10, window.innerWidth - img.width - 20);
           const maxY = Math.max(40, window.innerHeight - img.height - 120);
@@ -191,7 +209,6 @@
           const deltaX = nextX - currentX;
           const deltaY = nextY - currentY;
 
-          // 移動距離から到達時間（3〜6秒）を計算してメリハリをつける
           const distance = Math.hypot(deltaX, deltaY);
           const moveDuration = Math.min(Math.max(distance / 180, 3), 6);
 
@@ -199,12 +216,10 @@
           container.style.left = `${nextX}px`;
           container.style.top = `${nextY}px`;
 
-          // 【1】 進行方向（左右）による画像の反転
           const flipX = deltaX > 0 ? -1 : 1; 
 
-          // 【2】 昇降時の頭の傾き（角度計算）
           let angle = Math.atan2(deltaY, Math.abs(deltaX)) * (180 / Math.PI) * 0.35;
-          angle = Math.max(-20, Math.min(20, angle)); // 最大20度までに制限
+          angle = Math.max(-20, Math.min(20, angle));
           if (flipX === -1) angle = -angle;
 
           img.style.transform = `scaleX(${flipX}) rotate(${angle}deg)`;
@@ -212,15 +227,12 @@
           currentX = nextX;
           currentY = nextY;
 
-          // 移動完了後、少し一休み（1〜2秒）してから次の場所へ泳ぐ
           const restTime = Math.random() * 1500 + 1000;
           moveTimer = setTimeout(swim, (moveDuration * 1000) + restTime);
         };
 
-        // 登場直後に泳ぎ開始
         setTimeout(swim, 300);
 
-        // 120秒（2分）後に退場
         setTimeout(() => {
           clearTimeout(moveTimer);
           
