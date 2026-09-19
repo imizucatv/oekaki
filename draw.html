@@ -149,7 +149,7 @@
     // 送信処理
     window.sendDrawing = function() {
       // 完全に白紙の場合は送信しない簡易チェック（必要に応じて）
-      const dataURL = canvas.toDataURL("image/png");
+      const dataURL = canvas.toDataURL("image/webp", 0.6);
       push(ref(db, 'art_stream'), { dataURL: dataURL, createdAt: Date.now() });
       
       // 送信後はキャンバスをリセット
