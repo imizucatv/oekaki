@@ -4,6 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>お絵描きアプリ</title>
+
+  <!-- ★ アプリ化（フルスクリーン化）用の設定 ★ -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="お絵描き">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#fce4ec">
+
   <style>
     /* iOS/Androidのアドレスバー伸縮に対応した高さ設定＆スクロール防止 */
     html, body {
@@ -11,16 +19,15 @@
       padding: 0;
       width: 100vw;
       height: 100vh;
-      height: 100dvh; /* 最新の動的ビューポート高さ */
+      height: 100dvh;
       overflow: hidden;
-      overscroll-behavior: none; /* バウンス・スクロール禁止 */
+      overscroll-behavior: none;
       background-color: #fce4ec;
       font-family: sans-serif;
       display: flex;
       flex-direction: column;
     }
     
-    /* ツールバーを小さめの画面（iPad miniなど）でも収まるよう最適化 */
     .toolbar { 
       background: #fff; 
       padding: 6px 10px; 
@@ -31,7 +38,7 @@
       flex-wrap: wrap; 
       box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
       z-index: 10; 
-      flex-shrink: 0; /* 画面が狭くても潰れないようにする */
+      flex-shrink: 0;
     }
     
     .tool-group { 
@@ -54,11 +61,10 @@
       cursor: pointer; 
       font-weight: bold; 
       transition: 0.1s; 
-      white-space: nowrap; /* ボタンテキストの改行を防止 */
+      white-space: nowrap;
     }
     button:active { transform: scale(0.95); }
     
-    /* ボタン選択状態 */
     button.active { outline: 3px solid #2196f3; box-shadow: 0 0 6px rgba(33, 150, 243, 0.5); }
     
     .btn-pen { background: #333; color: #fff; }
@@ -75,10 +81,9 @@
       border-radius: 24px; 
     }
 
-    /* キャンバスエリア（残りの画面領域にピッタリ納める） */
     .canvas-wrapper { 
       flex: 1; 
-      min-height: 0; /* Flexboxでの縮小バグを防ぐ */
+      min-height: 0;
       min-width: 0;
       display: flex; 
       justify-content: center; 
@@ -90,10 +95,10 @@
     }
     
     canvas { 
-      background-color: #e8e8e8; /* 塗りの白い箇所がわかるよう薄いグレー */
+      background-color: #e8e8e8;
       border-radius: 12px; 
       box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
-      touch-action: none; /* タッチスクロールを完全防止 */
+      touch-action: none; 
       max-width: 100%; 
       max-height: 100%; 
       object-fit: contain;
@@ -126,7 +131,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // Firebase設定[cite: 2]
     const firebaseConfig = {
       apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
       authDomain: "espu9owen.firebaseapp.com",
@@ -151,7 +155,6 @@
 
     const bucketCursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="%23ff9800" stroke="%23333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2a2 2 0 0 0 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/></svg>') 2 28, auto`;
 
-    // 履歴（Undo）管理
     const historyStack = [];
     const MAX_HISTORY = 15;
 
@@ -169,7 +172,6 @@
       }
     };
 
-    // ツールボタンのモード切替
     window.setMode = function(newMode) {
       mode = newMode;
       document.getElementById('btnPen').classList.remove('active');
@@ -191,7 +193,6 @@
       }
     };
 
-    // 座標補正
     const getPos = (e) => {
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
@@ -212,7 +213,7 @@
 
       if (mode === 'fill') {
         floodFill(pos.x, pos.y, colorPicker.value);
-        setMode('pen'); // 塗りつぶし完了後、自動でペンモードに戻す
+        setMode('pen');
       } else {
         drawing = true; 
         draw(e); 
@@ -252,7 +253,6 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     };
 
-    // 塗りつぶし（Flood Fill）
     function floodFill(startX, startY, fillColorHex) {
       startX = Math.floor(startX);
       startY = Math.floor(startY);
@@ -349,7 +349,6 @@
       ctx.putImageData(imageData, 0, 0);
     }
 
-    // 送信処理
     window.sendDrawing = function() {
       const dataURL = canvas.toDataURL("image/webp", 0.6);
       push(ref(db, 'art_stream'), { dataURL: dataURL, createdAt: Date.now() });
