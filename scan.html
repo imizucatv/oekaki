@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>お絵描きスキャナー</title>
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100dvh;
+      overflow: hidden;
+      background-color: #222;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      color: #fff;
+    }
+
+    .header {
+      padding: 10px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      text-align: center;
+      background: rgba(0,0,0,0.5);
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    /* カメラ映像とガイド枠のエリア */
+    .camera-container {
+      position: relative;
+      width: 90vw;
+      height: 65dvh;
+      max-width: 800px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      background: #000;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* 画面上の赤枠ガイド */
+    .guide-frame {
+      position: absolute;
+      width: 80%;
+      height: 80%;
+      border: 4px dashed #ff5252;
+      border-radius: 12px;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4); /* 枠の外側を暗くする */
+      pointer-events: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .guide-text {
+      background: rgba(255, 82, 82, 0.8);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: bold;
+    }
+
+    /* コントロールボタン群 */
+    .controls {
+      padding: 15px;
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      width: 100%;
+      background: rgba(0,0,0,0.5);
+      box-sizing: border-box;
+    }
+
+    button {
+      font-size: 1.1rem;
+      padding: 12px 24px;
+      border-radius: 30px;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.1s;
+    }
+    button:active { transform: scale(0.95); }
+
+    .btn-scan { background: #ff9800; color: #fff; font-size: 1.3rem; padding: 14px 32px; box-shadow: 0 4px 10px rgba(255,152,0,0.4); }
+    .btn-send { background: #4caf50; color: #fff; display: none; }
+    .btn-retry { background: #757575; color: #fff; display: none; }
+
+    /* 非表示の処理用Canvas */
+    canvas { display: none; }
+  </style>
+</head>
+<body>
+
+  <div class="header">枠の中に紙のえを合わせてね！</div>
+
+  <div class="camera-container">
+    <video id="video" autoplay playsinline muted></video>
+    <div class="guide-frame">
+      <span class="guide-text" id="guideText">ここに絵を入れてね</span>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="btnScan" class="btn-scan" onclick="captureAndProcess()">📷 スキャン！</button>
+    <button id="btnRetry" class="btn-retry" onclick="resetScan()">🔄 とりなおす</button>
+    <button id="btnSend" class="btn-send" onclick="sendToAquarium()">🚀 およがせる！</button>
+  </div>
+
+  <canvas id="processCanvas"></canvas>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // Firebase設定[cite: 1, 2]
+    const firebaseConfig = {
+      apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
+      authDomain: "espu9owen.firebaseapp.com",
+      databaseURL: "https://espu9owen-default-rtdb.firebaseio.com",
+      projectId: "espu9owen",
+      storageBucket: "espu9owen.firebasestorage.app",
+      messagingSenderId: "1003969526788",
+      appId: "1:1003969526788:web:00a61b5a0cc2281de54951",
+      measurementId: "G-GLW0L4Y53H"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('processCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let processedDataURL = null;
+
+    // カメラの起動（背面の外カメラを優先指定）
+    async function initCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+        video.srcObject = stream;
+      } catch (err) {
+        alert("カメラが起動できませんでした。アクセス許可を確認してください。");
+      }
+    }
+    initCamera();
+
+    // 撮影 & 白背景の自動透明化処理
+    window.captureAndProcess = function() {
+      // ビデオの解像度にCanvasサイズを合わせる
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      // 1. カメラ映像をCanvasに描画
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // 2. 赤枠（80%の領域）の中身だけ切り抜く
+      const cropWidth = canvas.width * 0.8;
+      const cropHeight = canvas.height * 0.8;
+      const cropX = (canvas.width - cropWidth) / 2;
+      const cropY = (canvas.height - cropHeight) / 2;
+
+      const imageData = ctx.getImageData(cropX, cropY, cropWidth, cropHeight);
+      const data = imageData.data;
+
+      // 3. 白い部分（紙の地の色）を自動で透明（アルファ値0）にするアルゴリズム
+      const threshold = 180; // 明るさのしきい値（180以上を白背景と判定）
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        
+        // 輝度（明るさ）の計算
+        const brightness = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+        // 白っぽいピクセルは透明にする
+        if (brightness > threshold) {
+          data[i + 3] = 0; // 透明化
+        }
+      }
+
+      // 切り抜いたサイズにCanvasを再設定して画像を反映
+      canvas.width = cropWidth;
+      canvas.height = cropHeight;
+      ctx.putImageData(imageData, 0, 0);
+
+      // 画像データを保持
+      processedDataURL = canvas.toDataURL("image/webp", 0.6);
+
+      // ボタンと表示の切り替え
+      video.pause(); // 映像を一時停止してフリーズ（プレビュー状態）
+      document.getElementById('guideText').innerText = "このえでおよがせる？";
+      document.getElementById('btnScan').style.display = 'none';
+      document.getElementById('btnRetry').style.display = 'inline-block';
+      document.getElementById('btnSend').style.display = 'inline-block';
+    };
+
+    // 取り直し処理
+    window.resetScan = function() {
+      video.play();
+      document.getElementById('guideText').innerText = "ここに絵を入れてね";
+      document.getElementById('btnScan').style.display = 'inline-block';
+      document.getElementById('btnRetry').style.display = 'none';
+      document.getElementById('btnSend').style.display = 'none';
+    };
+
+    // 水族館（display.html）へ送信
+    window.sendToAquarium = function() {
+      if (!processedDataURL) return;
+
+      push(ref(db, 'art_stream'), { dataURL: processedDataURL, createdAt: Date.now() });
+      
+      alert("すいぞくかんにおくったよ！");
+      resetScan();
+    };
+  </script>
+</body>
+</html>
