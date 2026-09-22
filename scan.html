@@ -187,7 +187,7 @@
     }
     initCamera();
 
-    // ★ イラスト抽出 ＆ 自動めいっぱい拡大アルゴリズム
+    // ★ 外枠カット＆イラスト高解像度抽出アルゴリズム
     window.captureAndCrop = function() {
       if (!video.videoWidth || !video.videoHeight) return;
 
@@ -197,7 +197,6 @@
       const vWidth = video.videoWidth;
       const vHeight = video.videoHeight;
 
-      // 画面上の赤枠位置を正確に計算
       const containerRatio = containerRect.width / containerRect.height;
       const videoRatio = vWidth / vHeight;
 
@@ -236,13 +235,23 @@
       const imgData = ctx.getImageData(0, 0, cropW, cropH);
       const data = imgData.data;
 
+      // ★ 外側の黒枠を除外するための外周マージン（端から8%の領域を無視）
+      const borderMarginX = Math.floor(cropW * 0.08);
+      const borderMarginY = Math.floor(cropH * 0.08);
+
       let minX = cropW, maxX = 0, minY = cropH, maxY = 0;
       let hasContent = false;
 
-      // 白紙除去＆線・色のみ抽出
       for (let y = 0; y < cropH; y++) {
         for (let x = 0; x < cropW; x++) {
           const idx = (y * cropW + x) * 4;
+
+          // 用紙の外枠が映り込む外周（端から8%）は強制的に消去・無効化
+          if (x < borderMarginX || x > cropW - borderMarginX || y < borderMarginY || y > cropH - borderMarginY) {
+            data[idx + 3] = 0;
+            continue;
+          }
+
           const r = data[idx];
           const g = data[idx + 1];
           const b = data[idx + 2];
@@ -271,7 +280,6 @@
         return;
       }
 
-      // 検出したイラストの範囲
       const pad = 8;
       minX = Math.max(0, minX - pad);
       minY = Math.max(0, minY - pad);
@@ -281,13 +289,12 @@
       const srcW = maxX - minX;
       const srcH = maxY - minY;
 
-      // 切り抜いたイラスト画像を作成
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = cropW;
       tempCanvas.height = cropH;
       tempCanvas.getContext('2d').putImageData(imgData, 0, 0);
 
-      // ★ どんな絵でも大画面で迫力が出るよう「500×500px」に自動拡大＆中央配置
+      // 500x500の正方形キャンバスの中央にキレイに配置＆自動拡大
       const targetSize = 500;
       previewCanvas.width = targetSize;
       previewCanvas.height = targetSize;
@@ -295,19 +302,17 @@
       const pCtx = previewCanvas.getContext('2d');
       pCtx.clearRect(0, 0, targetSize, targetSize);
 
-      // 縦横比を維持しながら最大サイズに拡大計算
       const fitScale = Math.min((targetSize - 20) / srcW, (targetSize - 20) / srcH);
       const destW = srcW * fitScale;
       const destH = srcH * fitScale;
       const destX = (targetSize - destW) / 2;
       const destY = (targetSize - destH) / 2;
 
-      // 高解像度キャンバスの中央に拡大描画
       pCtx.drawImage(tempCanvas, minX, minY, srcW, srcH, destX, destY, destW, destH);
 
       processedDataURL = previewCanvas.toDataURL("image/png");
 
-      // 画面表示切替
+      // 表示切替
       video.style.display = 'none';
       document.getElementById('guideFrame').style.display = 'none';
       previewCanvas.style.display = 'block';
