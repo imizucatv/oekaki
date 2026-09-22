@@ -10,96 +10,63 @@
 
   <style>
     html, body {
-      margin: 0;
-      padding: 0;
-      width: 100vw;
-      height: 100dvh;
+      margin: 0; padding: 0;
+      width: 100vw; height: 100dvh;
       overflow: hidden;
       background: linear-gradient(135deg, #ffe0b2 0%, #ffcc80 100%);
       font-family: sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
       user-select: none;
     }
 
     .container {
       text-align: center;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 30px;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 20px;
     }
 
     .title {
-      font-size: 2rem;
-      font-weight: bold;
-      color: #5d4037;
-      text-shadow: 1px 1px 0 #fff;
+      font-size: 2rem; font-weight: bold;
+      color: #5d4037; text-shadow: 1px 1px 0 #fff;
     }
 
-    /* メインの巨大エサボタン */
     .feed-button {
-      width: 220px;
-      height: 220px;
+      width: 240px; height: 240px;
       border-radius: 50%;
       background: linear-gradient(145deg, #8d6e63, #5d4037);
       border: 8px solid #fff;
       box-shadow: 0 12px 25px rgba(0,0,0,0.3), inset 0 4px 8px rgba(255,255,255,0.3);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: transform 0.1s, box-shadow 0.1s;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      cursor: pointer; transition: transform 0.08s;
       outline: none;
     }
 
     .feed-button:active {
-      transform: scale(0.92);
+      transform: scale(0.90);
       box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
 
-    .feed-icon {
-      font-size: 4.5rem;
-      line-height: 1;
-    }
-
-    .feed-label {
-      color: #fff;
-      font-size: 1.4rem;
-      font-weight: bold;
-      margin-top: 8px;
-    }
-
-    /* 連打防止時のタイマープログレス表示 */
-    .cooldown-text {
-      font-size: 1.1rem;
-      color: #8d6e63;
-      font-weight: bold;
-      height: 24px;
-    }
+    .feed-icon { font-size: 5rem; line-height: 1; }
+    .feed-label { color: #fff; font-size: 1.5rem; font-weight: bold; margin-top: 6px; }
   </style>
 </head>
 <body>
 
   <div class="container">
-    <div class="title">🐟 おさかなに えさを あげよう！ 🦀</div>
+    <div class="title">🐟 えさを れんだ してみよう！ 🦀</div>
 
     <button class="feed-button" id="feedBtn" onclick="giveFood()">
       <span class="feed-icon">🧆</span>
-      <span class="feed-label">えさをあげる</span>
+      <span class="feed-label">えさをあげる！</span>
     </button>
-
-    <div class="cooldown-text" id="cooldownText">ボタンをおしてね！</div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // Firebase設定[cite: 1, 2]
     const firebaseConfig = {
       apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
       authDomain: "espu9owen.firebaseapp.com",
@@ -114,27 +81,20 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    let isCoolingDown = false;
+    let lastFeedTime = 0;
 
     window.giveFood = function() {
-      if (isCoolingDown) return;
+      const now = Date.now();
+      if (now - lastFeedTime < 300) return; // 0.3秒の高速連打許可
+      lastFeedTime = now;
 
-      isCoolingDown = true;
-      const btn = document.getElementById('feedBtn');
-      const text = document.getElementById('cooldownText');
-
-      // Firebaseの feed_stream にプッシュ
-      push(ref(db, 'feed_stream'), { createdAt: Date.now() });
-
-      text.innerText = "えさを なげ入れたよ！";
-      btn.style.opacity = "0.6";
-
-      // 1.5秒間の連打防止（クールダウン）
-      setTimeout(() => {
-        isCoolingDown = false;
-        btn.style.opacity = "1";
-        text.innerText = "ボタンをおしてね！";
-      }, 1500);
+      // 1タップで 2〜3 個のエサをバラバラに投下！
+      const foodCount = Math.floor(Math.random() * 2) + 2; 
+      for (let i = 0; i < foodCount; i++) {
+        setTimeout(() => {
+          push(ref(db, 'feed_stream'), { createdAt: Date.now() });
+        }, i * 120);
+      }
     };
   </script>
 </body>

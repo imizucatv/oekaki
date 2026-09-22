@@ -21,29 +21,12 @@
     }
 
     .header {
-      padding: 8px; font-size: 1.1rem; font-weight: bold;
+      padding: 10px; font-size: 1.1rem; font-weight: bold;
       text-align: center; background: rgba(0,0,0,0.5); width: 100%; box-sizing: border-box;
     }
 
-    /* 3種類選択ボタン */
-    .type-selector {
-      display: flex; gap: 8px; justify-content: center;
-      padding: 6px; width: 100%; background: rgba(0,0,0,0.3); box-sizing: border-box;
-    }
-
-    .btn-type {
-      font-size: 0.95rem; padding: 8px 14px; border-radius: 20px;
-      border: 2px solid transparent; cursor: pointer; font-weight: bold; transition: 0.2s;
-    }
-    .btn-type.active {
-      border-color: #fff; box-shadow: 0 0 10px rgba(255, 255, 255, 0.6); transform: scale(1.05);
-    }
-    .btn-fish { background: #2196f3; color: #fff; }
-    .btn-crab { background: #ff9800; color: #fff; }
-    .btn-octopus { background: #e91e63; color: #fff; }
-
     .camera-container {
-      position: relative; width: 90vw; height: 58dvh; max-width: 800px;
+      position: relative; width: 90vw; height: 65dvh; max-width: 800px;
       display: flex; justify-content: center; align-items: center;
       overflow: hidden; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
       background: #333;
@@ -75,7 +58,7 @@
     }
 
     .controls {
-      padding: 12px; display: flex; gap: 12px; justify-content: center;
+      padding: 15px; display: flex; gap: 15px; justify-content: center;
       width: 100%; background: rgba(0,0,0,0.5); box-sizing: border-box;
     }
 
@@ -85,9 +68,37 @@
     }
     button:active { transform: scale(0.95); }
 
-    .btn-scan { background: #ff9800; color: #fff; font-size: 1.3rem; padding: 12px 32px; box-shadow: 0 4px 10px rgba(255,152,0,0.4); }
-    .btn-send { background: #4caf50; color: #fff; display: none; }
+    .btn-scan { background: #ff9800; color: #fff; font-size: 1.3rem; padding: 14px 32px; box-shadow: 0 4px 10px rgba(255,152,0,0.4); }
+    .btn-send { background: #4caf50; color: #fff; display: none; font-size: 1.2rem; padding: 14px 28px; }
     .btn-retry { background: #757575; color: #fff; display: none; }
+
+    /* ★ 生物選択ダイアログ（ポップアップ） ★ */
+    .modal-overlay {
+      display: none;
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
+      background: rgba(0,0,0,0.85); z-index: 100;
+      flex-direction: column; align-items: center; justify-content: center;
+      gap: 20px;
+    }
+
+    .modal-title {
+      font-size: 1.6rem; font-weight: bold; color: #fff;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+
+    .modal-buttons {
+      display: flex; flex-direction: column; gap: 15px; width: 80%; max-width: 320px;
+    }
+
+    .btn-choice {
+      font-size: 1.4rem; padding: 16px; border-radius: 40px; border: none;
+      color: #fff; font-weight: bold; cursor: pointer;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.4); transition: transform 0.1s;
+    }
+    .btn-choice:active { transform: scale(0.95); }
+    .choice-fish { background: #2196f3; }
+    .choice-crab { background: #ff9800; }
+    .choice-octopus { background: #e91e63; }
 
     #processCanvas { display: none; }
   </style>
@@ -95,13 +106,6 @@
 <body>
 
   <div class="header">しかくい赤枠の中にえを入れてね！</div>
-
-  <!-- 生物タイプ切替（3種類） -->
-  <div class="type-selector">
-    <button id="btnFish" class="btn-type btn-fish active" onclick="selectType('fish')">🐟 さかな</button>
-    <button id="btnCrab" class="btn-type btn-crab" onclick="selectType('crab')">🦀 カニ</button>
-    <button id="btnOctopus" class="btn-type btn-octopus" onclick="selectType('octopus')">🐙 たこ・くらげ</button>
-  </div>
 
   <div class="camera-container" id="cameraContainer">
     <video id="video" autoplay playsinline muted></video>
@@ -115,7 +119,17 @@
   <div class="controls">
     <button id="btnScan" class="btn-scan" onclick="captureAndCrop()">📷 スキャン！</button>
     <button id="btnRetry" class="btn-retry" onclick="resetScan()">🔄 とりなおす</button>
-    <button id="btnSend" class="btn-send" onclick="sendToAquarium()">🚀 およがせる！</button>
+    <button id="btnSend" class="btn-send" onclick="openChoiceModal()">🚀 およがせる！</button>
+  </div>
+
+  <!-- ★ 送信時ポップアップモーダル ★ -->
+  <div class="modal-overlay" id="choiceModal">
+    <div class="modal-title">どれを およがせる？</div>
+    <div class="modal-buttons">
+      <button class="btn-choice choice-fish" onclick="selectAndSend('fish')">🐟 さかな</button>
+      <button class="btn-choice choice-crab" onclick="selectAndSend('crab')">🦀 カニ</button>
+      <button class="btn-choice choice-octopus" onclick="selectAndSend('octopus')">🐙 たこ・くらげ</button>
+    </div>
   </div>
 
   <canvas id="processCanvas"></canvas>
@@ -146,7 +160,6 @@
     const ctx = processCanvas.getContext('2d', { willReadFrequently: true });
     
     let processedDataURL = null;
-    let selectedType = 'fish';
 
     async function initCamera() {
       try {
@@ -160,17 +173,6 @@
       }
     }
     initCamera();
-
-    window.selectType = function(type) {
-      selectedType = type;
-      ['btnFish', 'btnCrab', 'btnOctopus'].forEach(id => {
-        document.getElementById(id).classList.remove('active');
-      });
-
-      if (type === 'fish') document.getElementById('btnFish').classList.add('active');
-      if (type === 'crab') document.getElementById('btnCrab').classList.add('active');
-      if (type === 'octopus') document.getElementById('btnOctopus').classList.add('active');
-    };
 
     window.captureAndCrop = function() {
       if (!video.videoWidth || !video.videoHeight) return;
@@ -314,18 +316,26 @@
       video.style.display = 'block';
       document.getElementById('guideFrame').style.display = 'flex';
       previewCanvas.style.display = 'none';
+      document.getElementById('choiceModal').style.display = 'none';
 
       document.getElementById('btnScan').style.display = 'inline-block';
       document.getElementById('btnRetry').style.display = 'none';
       document.getElementById('btnSend').style.display = 'none';
     };
 
-    window.sendToAquarium = function() {
+    // モーダルを開く
+    window.openChoiceModal = function() {
       if (!processedDataURL) return;
+      document.getElementById('choiceModal').style.display = 'flex';
+    };
+
+    // タイプを選択して送信
+    window.selectAndSend = function(type) {
+      document.getElementById('choiceModal').style.display = 'none';
 
       push(ref(db, 'art_stream'), { 
         dataURL: processedDataURL, 
-        type: selectedType, // fish / crab / octopus
+        type: type,
         createdAt: Date.now() 
       }).then(() => {
         alert("すいぞくかんにおくったよ！");
