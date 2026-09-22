@@ -150,7 +150,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // Firebase設定[cite: 1, 2]
+    // Firebase設定
     const firebaseConfig = {
       apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
       authDomain: "espu9owen.firebaseapp.com",
@@ -187,7 +187,7 @@
     }
     initCamera();
 
-    // ★ 外枠カット＆イラスト高解像度抽出アルゴリズム
+    // ★ 用紙の黒枠自動特定 ＆ 消去アルゴリズム
     window.captureAndCrop = function() {
       if (!video.videoWidth || !video.videoHeight) return;
 
@@ -235,10 +235,68 @@
       const imgData = ctx.getImageData(0, 0, cropW, cropH);
       const data = imgData.data;
 
-      // ★ 外側の黒枠を除外するための外周マージン（端から8%の領域を無視）
-      const borderMarginX = Math.floor(cropW * 0.08);
-      const borderMarginY = Math.floor(cropH * 0.08);
+      // ----------------------------------------------------
+      // 1. 用紙の正方形「黒枠」の位置を外側から自動特定
+      // ----------------------------------------------------
+      const isBlackPixel = (x, y) => {
+        const idx = (Math.floor(y) * cropW + Math.floor(x)) * 4;
+        const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+        return brightness < 110;
+      };
 
+      let innerLeft = 0;
+      let innerRight = cropW;
+      let innerTop = 0;
+      let innerBottom = cropH;
+
+      const midY = cropH / 2;
+      const midX = cropW / 2;
+
+      // 左から右へ走査して黒枠の「内側の縁」を発見
+      for (let x = 0; x < midX; x++) {
+        if (isBlackPixel(x, midY)) {
+          while (x < midX && isBlackPixel(x, midY)) x++; // 黒枠の太さを通過
+          innerLeft = x + 6; // 黒枠の内側+6px余白
+          break;
+        }
+      }
+
+      // 右から左へ走査
+      for (let x = cropW - 1; x > midX; x--) {
+        if (isBlackPixel(x, midY)) {
+          while (x > midX && isBlackPixel(x, midY)) x--;
+          innerRight = x - 6;
+          break;
+        }
+      }
+
+      // 上から下へ走査
+      for (let y = 0; y < midY; y++) {
+        if (isBlackPixel(midX, y)) {
+          while (y < midY && isBlackPixel(midX, y)) y++;
+          innerTop = y + 6;
+          break;
+        }
+      }
+
+      // 下から上へ走査
+      for (let y = cropH - 1; y > midY; y--) {
+        if (isBlackPixel(midX, y)) {
+          while (y > midY && isBlackPixel(midX, y)) y--;
+          innerBottom = y - 6;
+          break;
+        }
+      }
+
+      // 安全装置：もし黒枠が見つからなかった場合、外周10%を落とす
+      if (innerLeft === 0) innerLeft = Math.floor(cropW * 0.1);
+      if (innerRight === cropW) innerRight = Math.floor(cropW * 0.9);
+      if (innerTop === 0) innerTop = Math.floor(cropH * 0.1);
+      if (innerBottom === cropH) innerBottom = Math.floor(cropH * 0.9);
+
+      // ----------------------------------------------------
+      // 2. 黒枠および黒枠より外側をすべて完全消去（透明化）
+      // ----------------------------------------------------
       let minX = cropW, maxX = 0, minY = cropH, maxY = 0;
       let hasContent = false;
 
@@ -246,8 +304,8 @@
         for (let x = 0; x < cropW; x++) {
           const idx = (y * cropW + x) * 4;
 
-          // 用紙の外枠が映り込む外周（端から8%）は強制的に消去・無効化
-          if (x < borderMarginX || x > cropW - borderMarginX || y < borderMarginY || y > cropH - borderMarginY) {
+          // 黒枠より外側は強制的に透明化
+          if (x < innerLeft || x > innerRight || y < innerTop || y > innerBottom) {
             data[idx + 3] = 0;
             continue;
           }
@@ -259,8 +317,8 @@
           const brightness = (r + g + b) / 3;
           const colorDiff = Math.max(r, g, b) - Math.min(r, g, b);
 
-          const isBlackLine = brightness < 110;
-          const isColoredLine = (colorDiff > 28) && (brightness < 215);
+          const isBlackLine = brightness < 120;
+          const isColoredLine = (colorDiff > 25) && (brightness < 220);
 
           if (isBlackLine || isColoredLine) {
             data[idx + 3] = 255;
@@ -280,7 +338,7 @@
         return;
       }
 
-      const pad = 8;
+      const pad = 6;
       minX = Math.max(0, minX - pad);
       minY = Math.max(0, minY - pad);
       maxX = Math.min(cropW, maxX + pad);
@@ -294,7 +352,7 @@
       tempCanvas.height = cropH;
       tempCanvas.getContext('2d').putImageData(imgData, 0, 0);
 
-      // 500x500の正方形キャンバスの中央にキレイに配置＆自動拡大
+      // 500x500のキャンバス中央に魚・カニのイラストを自動拡大描画
       const targetSize = 500;
       previewCanvas.width = targetSize;
       previewCanvas.height = targetSize;
