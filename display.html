@@ -2,10 +2,8 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>みんなの水族館</title>
 
-  <!-- ★ アプリ化（フルスクリーン化）用の設定 ★ -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="みんなの水族館">
@@ -13,7 +11,6 @@
   <meta name="theme-color" content="#e1f5fe">
 
   <style>
-    /* 全体と海の中のグラデーション背景 */
     html, body { 
       margin: 0; 
       padding: 0;
@@ -45,7 +42,7 @@
       pointer-events: none;
     }
 
-    /* ふわふわ浮かぶ泡 */
+    /* 泡 */
     .bubble {
       position: absolute;
       bottom: -50px;
@@ -72,28 +69,37 @@
       z-index: 1;
     }
 
-    /* 魚（絵）の位置移動用ラッパー */
     .art-item {
       position: absolute;
       z-index: 10;
       pointer-events: none;
-      transition: left 3s cubic-bezier(0.25, 1, 0.5, 1), top 3s cubic-bezier(0.25, 1, 0.5, 1);
     }
     
-    /* 魚自体のビジュアルと「ゆらゆら運動」 */
     .art-body {
       max-width: 350px;
       max-height: 350px;
       filter: drop-shadow(0px 8px 12px rgba(0,0,0,0.2));
-      animation: swimWiggle 2.5s ease-in-out infinite alternate;
       transition: transform 0.8s ease-out, opacity 3s ease-in;
       transform-origin: center center;
     }
 
+    /* 🐟 魚用：水中ゆらゆらアニメーション */
+    .fish-wiggle {
+      animation: swimWiggle 2.5s ease-in-out infinite alternate;
+    }
     @keyframes swimWiggle {
       0% { transform: translateY(0px) rotate(-2deg); }
       50% { transform: translateY(-10px) rotate(3deg); }
       100% { transform: translateY(5px) rotate(-1deg); }
+    }
+
+    /* 🦀 カニ用：海底カサカサアニメーション */
+    .crab-wiggle {
+      animation: crabWalk 0.4s ease-in-out infinite alternate;
+    }
+    @keyframes crabWalk {
+      0% { transform: translateY(0px) rotate(-3deg); }
+      100% { transform: translateY(-6px) rotate(3deg); }
     }
     
     .fly-away .art-body {
@@ -104,13 +110,10 @@
 </head>
 <body>
 
-  <!-- 光の演出 -->
   <div class="sunbeams"></div>
-
-  <!-- 泡 -->
   <div id="bubbles-container"></div>
 
-  <!-- 海底のイラスト（SVG） -->
+  <!-- 海底のイラスト -->
   <div class="seabed-container">
     <svg viewBox="0 0 1200 160" preserveAspectRatio="none" style="width: 100%; height: 100%;">
       <path d="M0,160 L0,120 Q200,90 400,110 T800,100 T1200,110 L1200,160 Z" fill="#ffe082"/>
@@ -131,6 +134,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, onChildAdded, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
+    // Firebase設定[cite: 1, 2]
     const firebaseConfig = {
       apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
       authDomain: "espu9owen.firebaseapp.com",
@@ -145,18 +149,16 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // ★ 画面上をダブルクリック（またはタップ）でフルスクリーン切り替え ★
+    // ダブルクリックでフルスクリーン
     document.body.addEventListener('dblclick', () => {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(() => {});
       } else {
-        if (document.exitFullscreen) {
-          document.exitFullscreen();
-        }
+        if (document.exitFullscreen) document.exitFullscreen();
       }
     });
 
-    // 泡の自動生成
+    // 泡生成
     const bubblesContainer = document.getElementById('bubbles-container');
     function createBubble() {
       const bubble = document.createElement('div');
@@ -167,32 +169,33 @@
       bubble.style.left = `${Math.random() * 100}vw`;
       bubble.style.animationDuration = `${Math.random() * 5 + 5}s`;
       bubblesContainer.appendChild(bubble);
-
       setTimeout(() => bubble.remove(), 10000);
     }
     setInterval(createBubble, 800);
 
-    // 新しい絵が届いたときの処理
+    // 新しい絵を受信
     onChildAdded(ref(db, 'art_stream'), (snapshot) => {
       const data = snapshot.val();
-      createFloatingArt(data.dataURL);
+      createFloatingArt(data.dataURL, data.type || 'fish');
       remove(snapshot.ref);
     });
 
-    // 魚の遊泳生成関数
-    function createFloatingArt(dataURL) {
+    // 生物ごとの生成・運動制御関数
+    function createFloatingArt(dataURL, type) {
       const container = document.createElement('div');
       container.className = 'art-item';
 
       const img = document.createElement('img');
       img.src = dataURL;
-      img.className = 'art-body';
+      img.className = `art-body ${type === 'crab' ? 'crab-wiggle' : 'fish-wiggle'}`;
       container.appendChild(img);
       document.body.appendChild(container);
 
       img.onload = () => {
         let currentX = window.innerWidth / 2 - img.width / 2;
-        let currentY = window.innerHeight / 2 - img.height / 2;
+        let currentY = (type === 'crab') 
+          ? window.innerHeight - img.height - 40  // カニは海底に配置
+          : window.innerHeight / 2 - img.height / 2; // 魚は中央付近
 
         container.style.left = `${currentX}px`;
         container.style.top = `${currentY}px`;
@@ -201,28 +204,43 @@
 
         const swim = () => {
           const maxX = Math.max(10, window.innerWidth - img.width - 20);
-          const maxY = Math.max(40, window.innerHeight - img.height - 120);
           
-          const nextX = Math.max(10, Math.random() * maxX);
-          const nextY = Math.max(40, Math.random() * maxY);
+          let nextX = Math.max(10, Math.random() * maxX);
+          let nextY;
+
+          if (type === 'crab') {
+            // 🦀 カニの動き：海底（砂地の上）限定で横移動
+            nextY = window.innerHeight - img.height - (Math.random() * 30 + 30);
+          } else {
+            // 🐟 魚の動き：水中を広々と遊泳
+            const maxY = Math.max(40, window.innerHeight - img.height - 120);
+            nextY = Math.max(40, Math.random() * maxY);
+          }
 
           const deltaX = nextX - currentX;
           const deltaY = nextY - currentY;
 
           const distance = Math.hypot(deltaX, deltaY);
-          const moveDuration = Math.min(Math.max(distance / 180, 3), 6);
+          const moveDuration = (type === 'crab') 
+            ? Math.min(Math.max(distance / 120, 2), 5)  // カニは少しカサカサ動く
+            : Math.min(Math.max(distance / 180, 3), 6); // 魚はスーッと動く
 
-          container.style.transition = `left ${moveDuration}s cubic-bezier(0.25, 1, 0.5, 1), top ${moveDuration}s cubic-bezier(0.25, 1, 0.5, 1)`;
+          container.style.transition = `left ${moveDuration}s linear, top ${moveDuration}s linear`;
           container.style.left = `${nextX}px`;
           container.style.top = `${nextY}px`;
 
           const flipX = deltaX > 0 ? -1 : 1; 
 
-          let angle = Math.atan2(deltaY, Math.abs(deltaX)) * (180 / Math.PI) * 0.35;
-          angle = Math.max(-20, Math.min(20, angle));
-          if (flipX === -1) angle = -angle;
-
-          img.style.transform = `scaleX(${flipX}) rotate(${angle}deg)`;
+          if (type === 'crab') {
+            // カニは体を傾けずに横向き移動
+            img.style.transform = `scaleX(${flipX})`;
+          } else {
+            // 魚は上下移動に合わせて頭を傾ける
+            let angle = Math.atan2(deltaY, Math.abs(deltaX)) * (180 / Math.PI) * 0.35;
+            angle = Math.max(-20, Math.min(20, angle));
+            if (flipX === -1) angle = -angle;
+            img.style.transform = `scaleX(${flipX}) rotate(${angle}deg)`;
+          }
 
           currentX = nextX;
           currentY = nextY;
@@ -233,14 +251,13 @@
 
         setTimeout(swim, 300);
 
+        // 2分後に退場
         setTimeout(() => {
           clearTimeout(moveTimer);
-          
           container.classList.add('fly-away');
           container.style.transition = `left 3s ease-in, top 3s ease-in`;
           container.style.left = `${window.innerWidth + 500}px`;
           container.style.top = `-500px`;
-
           setTimeout(() => container.remove(), 3000);
         }, 120000);
       };

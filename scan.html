@@ -25,7 +25,7 @@
     }
 
     .header {
-      padding: 10px;
+      padding: 8px;
       font-size: 1.1rem;
       font-weight: bold;
       text-align: center;
@@ -34,10 +34,38 @@
       box-sizing: border-box;
     }
 
+    /* 種類選択ボタンエリア */
+    .type-selector {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      padding: 6px;
+      width: 100%;
+      background: rgba(0,0,0,0.3);
+      box-sizing: border-box;
+    }
+
+    .btn-type {
+      font-size: 1rem;
+      padding: 8px 20px;
+      border-radius: 20px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.2s;
+    }
+    .btn-type.active {
+      border-color: #fff;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+      transform: scale(1.05);
+    }
+    .btn-fish { background: #2196f3; color: #fff; }
+    .btn-crab { background: #757575; color: #fff; }
+
     .camera-container {
       position: relative;
       width: 90vw;
-      height: 65dvh;
+      height: 58dvh;
       max-width: 800px;
       display: flex;
       justify-content: center;
@@ -74,10 +102,10 @@
     /* ガイド枠 */
     .guide-frame {
       position: absolute;
-      width: 75vw;
-      height: 75vw;
-      max-width: 420px;
-      max-height: 420px;
+      width: 72vw;
+      height: 72vw;
+      max-width: 380px;
+      max-height: 380px;
       border: 4px dashed #ff5252;
       border-radius: 12px;
       box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
@@ -98,9 +126,9 @@
     }
 
     .controls {
-      padding: 15px;
+      padding: 12px;
       display: flex;
-      gap: 15px;
+      gap: 12px;
       justify-content: center;
       width: 100%;
       background: rgba(0,0,0,0.5);
@@ -118,7 +146,7 @@
     }
     button:active { transform: scale(0.95); }
 
-    .btn-scan { background: #ff9800; color: #fff; font-size: 1.3rem; padding: 14px 32px; box-shadow: 0 4px 10px rgba(255,152,0,0.4); }
+    .btn-scan { background: #ff9800; color: #fff; font-size: 1.3rem; padding: 12px 32px; box-shadow: 0 4px 10px rgba(255,152,0,0.4); }
     .btn-send { background: #4caf50; color: #fff; display: none; }
     .btn-retry { background: #757575; color: #fff; display: none; }
 
@@ -128,6 +156,12 @@
 <body>
 
   <div class="header">しかくい赤枠の中にえを入れてね！</div>
+
+  <!-- 1. 生物タイプの選択 -->
+  <div class="type-selector">
+    <button id="btnFish" class="btn-type btn-fish active" onclick="selectType('fish')">🐟 さかな</button>
+    <button id="btnCrab" class="btn-type btn-crab" onclick="selectType('crab')">🦀 カニ</button>
+  </div>
 
   <div class="camera-container" id="cameraContainer">
     <video id="video" autoplay playsinline muted></video>
@@ -173,7 +207,9 @@
     const ctx = processCanvas.getContext('2d', { willReadFrequently: true });
     
     let processedDataURL = null;
+    let selectedType = 'fish'; // 初期値はさかな
 
+    // 背面カメラ起動
     async function initCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -187,7 +223,26 @@
     }
     initCamera();
 
-    // ★ 用紙の黒枠自動特定 ＆ 消去アルゴリズム
+    // 選択タイプ切り替え関数
+    window.selectType = function(type) {
+      selectedType = type;
+      const btnFish = document.getElementById('btnFish');
+      const btnCrab = document.getElementById('btnCrab');
+
+      if (type === 'fish') {
+        btnFish.classList.add('active');
+        btnFish.style.backgroundColor = '#2196f3';
+        btnCrab.classList.remove('active');
+        btnCrab.style.backgroundColor = '#757575';
+      } else {
+        btnCrab.classList.add('active');
+        btnCrab.style.backgroundColor = '#ff9800';
+        btnFish.classList.remove('active');
+        btnFish.style.backgroundColor = '#757575';
+      }
+    };
+
+    // 用紙の黒枠特定＆イラスト自動拡大抽出アルゴリズム[cite: 3, 4]
     window.captureAndCrop = function() {
       if (!video.videoWidth || !video.videoHeight) return;
 
@@ -236,7 +291,7 @@
       const data = imgData.data;
 
       // ----------------------------------------------------
-      // 1. 用紙の正方形「黒枠」の位置を外側から自動特定
+      // 1. 用紙の正方形「黒枠」の位置を自動特定[cite: 3, 4]
       // ----------------------------------------------------
       const isBlackPixel = (x, y) => {
         const idx = (Math.floor(y) * cropW + Math.floor(x)) * 4;
@@ -252,16 +307,13 @@
       const midY = cropH / 2;
       const midX = cropW / 2;
 
-      // 左から右へ走査して黒枠の「内側の縁」を発見
       for (let x = 0; x < midX; x++) {
         if (isBlackPixel(x, midY)) {
-          while (x < midX && isBlackPixel(x, midY)) x++; // 黒枠の太さを通過
-          innerLeft = x + 6; // 黒枠の内側+6px余白
+          while (x < midX && isBlackPixel(x, midY)) x++;
+          innerLeft = x + 6;
           break;
         }
       }
-
-      // 右から左へ走査
       for (let x = cropW - 1; x > midX; x--) {
         if (isBlackPixel(x, midY)) {
           while (x > midX && isBlackPixel(x, midY)) x--;
@@ -269,8 +321,6 @@
           break;
         }
       }
-
-      // 上から下へ走査
       for (let y = 0; y < midY; y++) {
         if (isBlackPixel(midX, y)) {
           while (y < midY && isBlackPixel(midX, y)) y++;
@@ -278,8 +328,6 @@
           break;
         }
       }
-
-      // 下から上へ走査
       for (let y = cropH - 1; y > midY; y--) {
         if (isBlackPixel(midX, y)) {
           while (y > midY && isBlackPixel(midX, y)) y--;
@@ -288,14 +336,14 @@
         }
       }
 
-      // 安全装置：もし黒枠が見つからなかった場合、外周10%を落とす
+      // 黒枠が見つからなかった場合のセーフティ
       if (innerLeft === 0) innerLeft = Math.floor(cropW * 0.1);
       if (innerRight === cropW) innerRight = Math.floor(cropW * 0.9);
       if (innerTop === 0) innerTop = Math.floor(cropH * 0.1);
       if (innerBottom === cropH) innerBottom = Math.floor(cropH * 0.9);
 
       // ----------------------------------------------------
-      // 2. 黒枠および黒枠より外側をすべて完全消去（透明化）
+      // 2. 黒枠および黒枠より外側を消去＆イラストのみ抽出
       // ----------------------------------------------------
       let minX = cropW, maxX = 0, minY = cropH, maxY = 0;
       let hasContent = false;
@@ -304,7 +352,6 @@
         for (let x = 0; x < cropW; x++) {
           const idx = (y * cropW + x) * 4;
 
-          // 黒枠より外側は強制的に透明化
           if (x < innerLeft || x > innerRight || y < innerTop || y > innerBottom) {
             data[idx + 3] = 0;
             continue;
@@ -328,7 +375,7 @@
             if (y > maxY) maxY = y;
             hasContent = true;
           } else {
-            data[idx + 3] = 0; // 白紙・影を消去
+            data[idx + 3] = 0;
           }
         }
       }
@@ -352,7 +399,7 @@
       tempCanvas.height = cropH;
       tempCanvas.getContext('2d').putImageData(imgData, 0, 0);
 
-      // 500x500のキャンバス中央に魚・カニのイラストを自動拡大描画
+      // 500x500の正方形の中央へ拡大配置
       const targetSize = 500;
       previewCanvas.width = targetSize;
       previewCanvas.height = targetSize;
@@ -370,7 +417,7 @@
 
       processedDataURL = previewCanvas.toDataURL("image/png");
 
-      // 表示切替
+      // 画面表示切替
       video.style.display = 'none';
       document.getElementById('guideFrame').style.display = 'none';
       previewCanvas.style.display = 'block';
@@ -390,18 +437,23 @@
       document.getElementById('btnSend').style.display = 'none';
     };
 
+    // Firebaseへ種別（type）付きでデータ送信
     window.sendToAquarium = function() {
       if (!processedDataURL) return;
 
-      push(ref(db, 'art_stream'), { dataURL: processedDataURL, createdAt: Date.now() })
-        .then(() => {
-          alert("すいぞくかんにおくったよ！");
-          resetScan();
-        })
-        .catch((err) => {
-          alert("送信エラーが発生しました。");
-          console.error(err);
-        });
+      push(ref(db, 'art_stream'), { 
+        dataURL: processedDataURL, 
+        type: selectedType, // ★ 生物の種類（fish / crab）を一緒に送信
+        createdAt: Date.now() 
+      })
+      .then(() => {
+        alert("すいぞくかんにおくったよ！");
+        resetScan();
+      })
+      .catch((err) => {
+        alert("送信エラーが発生しました。");
+        console.error(err);
+      });
     };
   </script>
 </body>
