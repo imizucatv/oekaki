@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>みんなの水族館 - Ultimate Edition</title>
+  <title>みんなの水族館 - Perfect Evolution Edition</title>
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -52,19 +52,28 @@
       pointer-events: none; z-index: 1;
     }
 
+    /* 1層目：移動位置（left / top）用 */
     .art-item {
       position: absolute; z-index: 10; pointer-events: none;
       will-change: left, top;
     }
+
+    /* 2層目：拡大率（scale）＆向き（scaleX）専用ラッパー */
+    .art-scaler {
+      display: inline-block;
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* ぽよんと広がるイージング */
+      transform-origin: center center;
+    }
     
+    /* 3層目：純粋なCSS揺れアニメーション専用 */
     .art-body {
-      max-width: 250px; max-height: 250px;
+      max-width: 240px; max-height: 240px;
       filter: drop-shadow(0px 8px 12px rgba(0,0,0,0.2));
-      transition: transform 0.6s ease-out, opacity 3s ease-in;
+      transition: opacity 3s ease-in;
       transform-origin: center center;
     }
 
-    /* 🐟 魚：水中ゆらゆら */
+    /* 🐟 魚：ゆらゆら */
     .fish-wiggle { animation: swimWiggle 2.5s ease-in-out infinite alternate; }
     @keyframes swimWiggle {
       0% { transform: translateY(0px) rotate(-2deg); }
@@ -72,14 +81,14 @@
       100% { transform: translateY(5px) rotate(-1deg); }
     }
 
-    /* 🦀 カニ：海底カサカサ */
+    /* 🦀 カニ：横歩き */
     .crab-wiggle { animation: crabWalk 0.4s ease-in-out infinite alternate; }
     @keyframes crabWalk {
       0% { transform: translateY(0px) rotate(-3deg); }
       100% { transform: translateY(-6px) rotate(3deg); }
     }
 
-    /* 🐙 たこ・クラゲ：ぷかぷか伸縮浮遊 */
+    /* 🐙 たこ・クラゲ：ふわふわ伸縮 */
     .octopus-wiggle { animation: octopusFloat 3s ease-in-out infinite alternate; }
     @keyframes octopusFloat {
       0% { transform: translateY(0px) scaleY(1); }
@@ -102,7 +111,7 @@
       transition: top 8s linear, opacity 0.4s;
     }
 
-    /* 食べた時のポップアップ演出 */
+    /* ポップアップ演出 */
     .eat-effect {
       position: absolute;
       font-size: 1.4rem;
@@ -278,19 +287,25 @@
     }
 
     function createFloatingArt(dataURL, type) {
+      // 1層目：移動位置用（art-item）
       const container = document.createElement('div');
       container.className = 'art-item';
 
+      // 2層目：拡大＆反転専用ラッパー（art-scaler）
+      const scaler = document.createElement('div');
+      scaler.className = 'art-scaler';
+
+      // 3層目：ゆらゆらアニメーション画像（art-body）
       const img = document.createElement('img');
       img.src = dataURL;
 
-      // 3種類のCSSアニメーション割り当て
       let animationClass = 'fish-wiggle';
       if (type === 'crab') animationClass = 'crab-wiggle';
       if (type === 'octopus') animationClass = 'octopus-wiggle';
       img.className = `art-body ${animationClass}`;
 
-      container.appendChild(img);
+      scaler.appendChild(img);
+      container.appendChild(scaler);
       document.body.appendChild(container);
 
       img.onload = () => {
@@ -298,7 +313,6 @@
         const baseH = img.offsetHeight || 180;
 
         let currentX = Math.random() * (window.innerWidth - baseW - 120) + 60;
-        // 🦀 カニは生成された瞬間から海底（Y固定）！
         let currentY = (type === 'crab') 
           ? window.innerHeight - baseH - 40 
           : Math.random() * (window.innerHeight - baseH - 200) + 60;
@@ -315,7 +329,12 @@
         let eatenCount = 0;
         const maxEatCount = 5;
         let isFull = false;
-        let currentScale = 1.0;
+        let currentScale = 1.0; // 拡大スケール
+
+        // スケール＆向きの更新専用関数（scaler要素に適用）
+        const updateTransform = (flipX, angle = 0) => {
+          scaler.style.transform = `scaleX(${flipX}) rotate(${angle}deg) scale(${currentScale})`;
+        };
 
         const moveTo = (tx, ty, isFast = false) => {
           const currentW = baseW * currentScale;
@@ -324,7 +343,6 @@
           const maxX = Math.max(20, window.innerWidth - currentW - 40);
           const targetX = Math.min(Math.max(20, tx), maxX);
 
-          // ★ カニ（crab）はY座標を「絶対に」海底に固定！
           let targetY;
           if (type === 'crab') {
             targetY = window.innerHeight - currentH - 40;
@@ -346,7 +364,8 @@
           let angle = (type === 'crab' || type === 'octopus') ? 0 : Math.atan2(deltaY, Math.abs(deltaX)) * (180 / Math.PI) * 0.35;
           if (flipX === -1 && type === 'fish') angle = -angle;
 
-          img.style.transform = `scaleX(${flipX}) rotate(${angle}deg) scale(${currentScale})`;
+          // ★ 競合しない中層の scaler へトランスフォームを適用！
+          updateTransform(flipX, angle);
 
           currentX = targetX;
           currentY = targetY;
@@ -364,7 +383,6 @@
           targetFood: (foodObj) => {
             if (isTargetingFood || isLeaving || isFull || foodObj.isEaten) return;
 
-            // 🦀 カニはエサが海底付近（底から180px以内）に落ちてくるまで動かない
             if (type === 'crab' && foodObj.y < window.innerHeight - 180) {
               return;
             }
@@ -373,7 +391,6 @@
             currentTargetFood = foodObj;
             clearTimeout(moveTimer);
 
-            // カニはX座標のみ近づき、Yは海底固定
             moveTo(foodObj.x - (baseW * currentScale) / 2, foodObj.y - (baseH * currentScale) / 2, true);
           }
         };
@@ -389,13 +406,10 @@
           let nextY;
 
           if (type === 'crab') {
-            // 🦀 カニは海底の砂地で横移動
             nextY = window.innerHeight - currentH - 40;
           } else if (type === 'octopus') {
-            // 🐙 たこ・クラゲは中層〜海底上あたりを漂う
             nextY = Math.min(Math.max(100, Math.random() * (window.innerHeight - currentH - 100)), window.innerHeight - currentH - 100);
           } else {
-            // 🐟 魚は水中全域
             nextY = Math.min(Math.max(50, Math.random() * (window.innerHeight - currentH - 140)), window.innerHeight - currentH - 120);
           }
 
@@ -405,7 +419,7 @@
           moveTimer = setTimeout(swim, durationMs + restTime);
         };
 
-        // 🧠 AIフレーム監視（当たり判定距離を38pxに微調整）
+        // 🧠 AI判定ループ
         aiInterval = setInterval(() => {
           if (isLeaving) {
             clearInterval(aiInterval);
@@ -424,14 +438,20 @@
             const centerY = currentY + (baseH * currentScale) / 2;
             const dist = Math.hypot(currentTargetFood.x - centerX, currentTargetFood.y - centerY);
 
-            // ★ 当たり判定を 38px に短縮（ぴったり重なった時のみ食べる）
             if (dist < 38) {
               removeFood(currentTargetFood);
               isTargetingFood = false;
               currentTargetFood = null;
 
               eatenCount++;
-              currentScale += 0.08;
+              currentScale += 0.10; // ★ 1回食べるごとに10%ずつダイナミックに拡大！
+
+              // ★ 即座に拡大アニメーション（ぽよん！）を反映
+              scaler.style.transform += ` scale(1.15)`; // 一瞬膨らむ演出
+              setTimeout(() => {
+                const flipX = (container.style.left.replace('px','') > currentX) ? -1 : 1;
+                updateTransform(flipX, 0);
+              }, 200);
 
               if (eatenCount >= maxEatCount) {
                 isFull = true;
