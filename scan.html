@@ -54,7 +54,7 @@
       object-fit: cover;
     }
 
-    /* ★ プレビュー画面：透過部分が分かるように市松模様（チェック柄）に表示 ★ */
+    /* 透過状態がわかる市松模様背景 */
     #previewCanvas {
       display: none;
       max-width: 90%;
@@ -123,7 +123,7 @@
 </head>
 <body>
 
-  <div class="header">枠の中に紙のえを合わせてね！</div>
+  <div class="header">赤わくの中にえを入れてね！</div>
 
   <div class="camera-container">
     <video id="video" autoplay playsinline muted></video>
@@ -181,27 +181,35 @@
     }
     initCamera();
 
-    // スキャン＆自動透過処理
+    // 高精度スキャン＆影除去アルゴリズム
     window.captureAndCrop = function() {
       if (!video.videoWidth) return;
 
-      processCanvas.width = video.videoWidth;
-      processCanvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, processCanvas.width, processCanvas.height);
+      // 1. 全画面カメラ映像を一度保持
+      const rawCanvas = document.createElement('canvas');
+      rawCanvas.width = video.videoWidth;
+      rawCanvas.height = video.videoHeight;
+      const rawCtx = rawCanvas.getContext('2d');
+      rawCtx.drawImage(video, 0, 0);
 
-      // 中央80%の範囲を計算
-      const cropW = Math.floor(processCanvas.width * 0.8);
-      const cropH = Math.floor(processCanvas.height * 0.8);
-      const startX = Math.floor((processCanvas.width - cropW) / 2);
-      const startY = Math.floor((processCanvas.height - cropH) / 2);
+      // 2. 赤枠（中央80%）の位置とサイズを計算
+      const cropW = Math.floor(rawCanvas.width * 0.8);
+      const cropH = Math.floor(rawCanvas.height * 0.8);
+      const startX = Math.floor((rawCanvas.width - cropW) / 2);
+      const startY = Math.floor((rawCanvas.height - cropH) / 2);
 
-      const imgData = ctx.getImageData(startX, startY, cropW, cropH);
+      // 3. 赤枠内のみを厳密に抽出（赤枠外を物理的に100%カット）
+      processCanvas.width = cropW;
+      processCanvas.height = cropH;
+      ctx.drawImage(rawCanvas, startX, startY, cropW, cropH, 0, 0, cropW, cropH);
+
+      const imgData = ctx.getImageData(0, 0, cropW, cropH);
       const data = imgData.data;
 
       let minX = cropW, maxX = 0, minY = cropH, maxY = 0;
       let hasContent = false;
 
-      // ピクセルの透明化と範囲判定
+      // 4. ピクセルごとの「ペン線」「カラー線」「影/白紙」の自動選別
       for (let y = 0; y < cropH; y++) {
         for (let x = 0; x < cropW; x++) {
           const idx = (y * cropW + x) * 4;
@@ -212,30 +220,31 @@
           const brightness = (r + g + b) / 3;
           const colorDiff = Math.max(r, g, b) - Math.min(r, g, b);
 
-          // 明るい部分（紙の白）は透明にする
-          // 黒っぽいペン線 (brightness < 170) または 色のついた線 (colorDiff > 20) を残す
-          if (brightness < 170 || colorDiff > 20) {
-            data[idx + 3] = 255;
+          // 【判定ルール】
+          // ・黒ペン/濃い線: 輝度が 110 未満（影より十分に黒い）
+          // ・カラーペン/クレヨン: 彩度(colorDiff)が 32 以上（明確な色味がある）
+          const isBlackLine = brightness < 110;
+          const isColoredLine = (colorDiff > 32) && (brightness < 210);
+
+          if (isBlackLine || isColoredLine) {
+            data[idx + 3] = 255; // イラストとして採用
             if (x < minX) minX = x;
             if (x > maxX) maxX = x;
             if (y < minY) minY = y;
             if (y > maxY) maxY = y;
             hasContent = true;
           } else {
-            data[idx + 3] = 0; // 白背景を消去
+            data[idx + 3] = 0; // 影・紙の白地はすべて完全消去
           }
         }
       }
 
-      // 描画が見つからなかった、またはエラー値の場合のフォールバック
       if (!hasContent || minX >= maxX || minY >= maxY) {
-        minX = 0;
-        maxX = cropW;
-        minY = 0;
-        maxY = cropH;
+        alert("えが見つからなかったよ！サインペンやクーピーで濃く描いてね。");
+        return;
       }
 
-      // 余白（10px）を追加
+      // バウンディングボックスに10pxの余白を追加
       const pad = 10;
       minX = Math.max(0, minX - pad);
       minY = Math.max(0, minY - pad);
@@ -245,24 +254,22 @@
       const finalWidth = maxX - minX;
       const finalHeight = maxY - minY;
 
-      // プレビュー用キャンバスのサイズを設定
-      previewCanvas.width = finalWidth;
-      previewCanvas.height = finalHeight;
-
-      // 一時キャンバスを使って抽出
+      // 抽出した絵の範囲だけをプレビュー用Canvasへ描画
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = cropW;
       tempCanvas.height = cropH;
       tempCanvas.getContext('2d').putImageData(imgData, 0, 0);
 
+      previewCanvas.width = finalWidth;
+      previewCanvas.height = finalHeight;
+
       const pCtx = previewCanvas.getContext('2d');
       pCtx.clearRect(0, 0, finalWidth, finalHeight);
       pCtx.drawImage(tempCanvas, minX, minY, finalWidth, finalHeight, 0, 0, finalWidth, finalHeight);
 
-      // ★ 全端末で確実に動作するPNGデータとして生成 ★
       processedDataURL = previewCanvas.toDataURL("image/png");
 
-      // 画面表示をカメラから切り抜き結果（プレビュー）に切り替え
+      // 表示切り替え
       video.style.display = 'none';
       document.getElementById('guideFrame').style.display = 'none';
       previewCanvas.style.display = 'block';
@@ -282,24 +289,18 @@
       document.getElementById('btnSend').style.display = 'none';
     };
 
-    // 送信処理（エラー検知付き）
     window.sendToAquarium = function() {
       if (!processedDataURL) return;
 
-      try {
-        push(ref(db, 'art_stream'), { dataURL: processedDataURL, createdAt: Date.now() })
-          .then(() => {
-            alert("すいぞくかんにおくったよ！");
-            resetScan();
-          })
-          .catch((err) => {
-            alert("送信エラーが発生しました。ネット接続を確認してください。");
-            console.error(err);
-          });
-      } catch (e) {
-        alert("送信に失敗しました。");
-        console.error(e);
-      }
+      push(ref(db, 'art_stream'), { dataURL: processedDataURL, createdAt: Date.now() })
+        .then(() => {
+          alert("すいぞくかんにおくったよ！");
+          resetScan();
+        })
+        .catch((err) => {
+          alert("送信エラーが発生しました。");
+          console.error(err);
+        });
     };
   </script>
 </body>
