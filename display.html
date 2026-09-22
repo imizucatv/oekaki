@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>みんなの水族館 - Perfect AI Edition v20</title>
+  <title>みんなの水族館 - Exclusive Lock AI Edition</title>
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -237,6 +237,7 @@
         x: startX + 13,
         y: startY + 13,
         isEaten: false,
+        targetedBy: null, // ★ 1対1排他ロック用プロパティ（誰が狙っているか）
         id: Date.now() + Math.random()
       };
       activeFoods.push(foodObj);
@@ -337,6 +338,8 @@
         let isFull = false;
         let currentScale = 1.0;
 
+        const creatureObj = { type };
+
         const updateTransform = (flipX, angle = 0) => {
           scaler.style.transform = `scaleX(${flipX}) rotate(${angle}deg) scale(${currentScale})`;
         };
@@ -354,7 +357,6 @@
           let duration = 0;
 
           if (type === 'crab') {
-            // 🦀 カニ：Y座標を厳格固定（Transitionなし）
             const targetY = window.innerHeight - currentH - 40;
             const distance = Math.abs(deltaX);
             duration = Math.min(Math.max(distance / (isFast ? 240 : 140), 0.8), 4.0);
@@ -363,7 +365,6 @@
             container.style.left = `${targetX}px`;
             container.style.top = `${targetY}px`;
           } else {
-            // 🐟 魚・タコ：2D移動
             const targetY = Math.min(Math.max(40, ty), window.innerHeight - currentH - 120);
             deltaY = targetY - realPos.top;
             const distance = Math.hypot(deltaX, deltaY);
@@ -383,15 +384,29 @@
           return duration * 1000;
         };
 
+        // ★ エサの排他ターゲット関数（他の生物と重複しないように予約）
         const targetFood = (foodObj) => {
           if (isLeaving || isFull || foodObj.isEaten) return;
 
+          // 古い予約があれば解除
+          if (currentTargetFood && currentTargetFood.targetedBy === creatureObj) {
+            currentTargetFood.targetedBy = null;
+          }
+
           isTargetingFood = true;
           currentTargetFood = foodObj;
+          foodObj.targetedBy = creatureObj; // ★ ロック獲得！
           clearTimeout(moveTimer);
 
-          // ★ カニも上空に発生した瞬間にすぐさま真下のX座標へ移動開始！
           moveTo(foodObj.x - (baseW * currentScale) / 2, foodObj.y - (baseH * currentScale) / 2, true);
+        };
+
+        const releaseFoodTarget = () => {
+          if (currentTargetFood && currentTargetFood.targetedBy === creatureObj) {
+            currentTargetFood.targetedBy = null; // ★ ロック解除
+          }
+          isTargetingFood = false;
+          currentTargetFood = null;
         };
 
         const swim = () => {
@@ -418,7 +433,7 @@
           moveTimer = setTimeout(swim, durationMs + restTime);
         };
 
-        // 🧠 リアルタイム高精度AI（100ms周期）
+        // 🧠 1対1排他ロック対応AI（100ms周期）
         aiInterval = setInterval(() => {
           if (isLeaving) {
             clearInterval(aiInterval);
@@ -427,13 +442,16 @@
 
           const realPos = getRealPos();
 
-          // 1. 一番近いエサを探す（カニも上空のエサのX座標にすぐアプローチ）
+          // 1. まだ誰も狙っていない（未予約の）エサの中で、一番近いものを検索
           if (!isTargetingFood && !isFull && activeFoods.length > 0) {
             let closestFood = null;
             let minDistance = Infinity;
 
             activeFoods.forEach(food => {
               if (food.isEaten) return;
+              // ★ 他の生物が狙っているエサ（targetedByが自分以外）はスキップ！
+              if (food.targetedBy && food.targetedBy !== creatureObj) return;
+
               const dist = Math.hypot(food.x - realPos.x, food.y - realPos.y);
               if (dist < minDistance) {
                 minDistance = dist;
@@ -446,24 +464,21 @@
             }
           }
 
-          // 2. 追尾中：落ちていくエサのリアルタイム位置に向かって滑らかにホーミング
+          // 2. 追尾中＆食いつき判定
           if (isTargetingFood && currentTargetFood) {
             if (currentTargetFood.isEaten) {
-              isTargetingFood = false;
-              currentTargetFood = null;
+              releaseFoodTarget();
               swim();
               return;
             }
 
             let isHit = false;
             if (type === 'crab') {
-              // 🦀 カニ：X軸45px以内 ＆ エサが海底付近（底から180px以内）に届いたらパクッ！
               const dx = Math.abs(currentTargetFood.x - realPos.x);
               if (dx < 45 && currentTargetFood.y >= window.innerHeight - 180) {
                 isHit = true;
               }
             } else {
-              // 🐟 魚・タコ：2D距離45px以内なら即パクッ！
               const dist = Math.hypot(currentTargetFood.x - realPos.x, currentTargetFood.y - realPos.y);
               if (dist < 45) {
                 isHit = true;
@@ -471,9 +486,9 @@
             }
 
             if (isHit) {
-              removeFood(currentTargetFood);
-              isTargetingFood = false;
-              currentTargetFood = null;
+              const eatenFood = currentTargetFood;
+              releaseFoodTarget();
+              removeFood(eatenFood);
 
               eatenCount++;
               currentScale += 0.10;
@@ -495,19 +510,18 @@
 
               moveTimer = setTimeout(swim, 600);
             } else {
-              // ★ 落下中のエサの移動にリアルタイムでスムーズ追尾更新
+              // 落下中のエサの位置へ動的追尾
               moveTo(currentTargetFood.x - (baseW * currentScale) / 2, currentTargetFood.y - (baseH * currentScale) / 2, true);
             }
           }
         }, 100);
 
-        const creatureObj = { type };
         activeCreatures.push(creatureObj);
         setTimeout(swim, 300);
 
         setTimeout(() => {
           isLeaving = true;
-          isTargetingFood = false;
+          releaseFoodTarget();
           clearTimeout(moveTimer);
           clearInterval(aiInterval);
 

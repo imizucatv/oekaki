@@ -172,13 +172,13 @@
     }
     initCamera();
 
-    // ★ ノイズ・汚れ自動消去（連結成分クラスタリング解析）アルゴリズム
+    // ★ ノイズ除去アルゴリズム（細い線の目や小さなパーツを保護するように調整）
     function removeNoiseClusters(imgData, width, height) {
       const data = imgData.data;
       const visited = new Uint8Array(width * height);
       const clusters = [];
 
-      for (let y = 0; y < height; y += 2) { // 処理高速化のため2px刻み走査
+      for (let y = 0; y < height; y += 2) {
         for (let x = 0; x < width; x += 2) {
           const idx = y * width + x;
           if (data[idx * 4 + 3] > 0 && !visited[idx]) {
@@ -213,21 +213,19 @@
 
       if (clusters.length <= 1) return;
 
-      // 一番大きな描画ブロック（イラスト本体）を探す
       let maxClusterSize = 0;
       clusters.forEach(c => {
         if (c.length > maxClusterSize) maxClusterSize = c.length;
       });
 
-      // 本体の 1/15 以下の小さな孤立点・指の跡・ゴミ汚れを消去
-      const minThreshold = Math.max(120, maxClusterSize * 0.06);
+      // 細い線の描画や目の点などが消えないよう、クラスタサイズの削除基準をマイルドに（2.5%以下）
+      const minThreshold = Math.max(30, maxClusterSize * 0.025);
 
       clusters.forEach(c => {
         if (c.length < minThreshold) {
           c.forEach(centerIdx => {
             const cx = centerIdx % width;
             const cy = Math.floor(centerIdx / width);
-            // 周辺領域を透明化
             for (let dy = -2; dy <= 2; dy++) {
               for (let dx = -2; dx <= 2; dx++) {
                 const px = cx + dx;
@@ -320,7 +318,7 @@
       let minX = cropW, maxX = 0, minY = cropH, maxY = 0;
       let hasContent = false;
 
-      // 高感度カラー抽出
+      // ★ 高感度ペン抽出（細い黒ペンの薄い線・かすれ線も確実に捉える）
       for (let y = 0; y < cropH; y++) {
         for (let x = 0; x < cropW; x++) {
           const idx = (y * cropW + x) * 4;
@@ -332,8 +330,10 @@
           const brightness = (r + g + b) / 3;
           const colorDiff = Math.max(r, g, b) - Math.min(r, g, b);
 
-          const isBlackLine = brightness < 80; 
-          const isColoredLine = (colorDiff > 14) && (brightness < 238);
+          // 1. 細い黒ペン：輝度135未満 ＆ 色彩差20未満（R,G,Bが近い無彩色）
+          const isBlackLine = (colorDiff < 20) && (brightness < 135);
+          // 2. 色鉛筆・クーピー：色彩差14以上 ＆ 輝度238未満
+          const isColoredLine = (colorDiff >= 14) && (brightness < 238);
 
           if (isBlackLine || isColoredLine) {
             data[idx + 3] = 255;
@@ -341,17 +341,16 @@
             if (y < minY) minY = y; if (y > maxY) maxY = y;
             hasContent = true;
           } else {
-            data[idx + 3] = 0;
+            data[idx + 3] = 0; // 白紙・手の影を消去
           }
         }
       }
 
       if (!hasContent || minX >= maxX || minY >= maxY) {
-        alert("枠の中に絵が見つからなかったよ！もう少し濃く塗ってみてね。");
+        alert("枠の中に絵が見つからなかったよ！もう少し濃く描いてみてね。");
         return;
       }
 
-      // ★ 周囲のノイズ・汚れピクセルを自動除去
       removeNoiseClusters(imgData, cropW, cropH);
 
       const pad = 6;
