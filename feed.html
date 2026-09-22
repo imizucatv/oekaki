@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>エサやりターミナル</title>
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100dvh;
+      overflow: hidden;
+      background: linear-gradient(135deg, #ffe0b2 0%, #ffcc80 100%);
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+
+    .container {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 30px;
+    }
+
+    .title {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #5d4037;
+      text-shadow: 1px 1px 0 #fff;
+    }
+
+    /* メインの巨大エサボタン */
+    .feed-button {
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #8d6e63, #5d4037);
+      border: 8px solid #fff;
+      box-shadow: 0 12px 25px rgba(0,0,0,0.3), inset 0 4px 8px rgba(255,255,255,0.3);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s;
+      outline: none;
+    }
+
+    .feed-button:active {
+      transform: scale(0.92);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    .feed-icon {
+      font-size: 4.5rem;
+      line-height: 1;
+    }
+
+    .feed-label {
+      color: #fff;
+      font-size: 1.4rem;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+
+    /* 連打防止時のタイマープログレス表示 */
+    .cooldown-text {
+      font-size: 1.1rem;
+      color: #8d6e63;
+      font-weight: bold;
+      height: 24px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="title">🐟 おさかなに えさを あげよう！ 🦀</div>
+
+    <button class="feed-button" id="feedBtn" onclick="giveFood()">
+      <span class="feed-icon">🧆</span>
+      <span class="feed-label">えさをあげる</span>
+    </button>
+
+    <div class="cooldown-text" id="cooldownText">ボタンをおしてね！</div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // Firebase設定[cite: 1, 2]
+    const firebaseConfig = {
+      apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
+      authDomain: "espu9owen.firebaseapp.com",
+      databaseURL: "https://espu9owen-default-rtdb.firebaseio.com",
+      projectId: "espu9owen",
+      storageBucket: "espu9owen.firebasestorage.app",
+      messagingSenderId: "1003969526788",
+      appId: "1:1003969526788:web:00a61b5a0cc2281de54951",
+      measurementId: "G-GLW0L4Y53H"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    let isCoolingDown = false;
+
+    window.giveFood = function() {
+      if (isCoolingDown) return;
+
+      isCoolingDown = true;
+      const btn = document.getElementById('feedBtn');
+      const text = document.getElementById('cooldownText');
+
+      // Firebaseの feed_stream にプッシュ
+      push(ref(db, 'feed_stream'), { createdAt: Date.now() });
+
+      text.innerText = "えさを なげ入れたよ！";
+      btn.style.opacity = "0.6";
+
+      // 1.5秒間の連打防止（クールダウン）
+      setTimeout(() => {
+        isCoolingDown = false;
+        btn.style.opacity = "1";
+        text.innerText = "ボタンをおしてね！";
+      }, 1500);
+    };
+  </script>
+</body>
+</html>
