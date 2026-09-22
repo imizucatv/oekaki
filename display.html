@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>みんなの水族館 - Complete Edition</title>
+  <title>みんなの水族館 - Ultimate Edition</title>
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -64,6 +64,7 @@
       transform-origin: center center;
     }
 
+    /* 🐟 魚：水中ゆらゆら */
     .fish-wiggle { animation: swimWiggle 2.5s ease-in-out infinite alternate; }
     @keyframes swimWiggle {
       0% { transform: translateY(0px) rotate(-2deg); }
@@ -71,10 +72,19 @@
       100% { transform: translateY(5px) rotate(-1deg); }
     }
 
+    /* 🦀 カニ：海底カサカサ */
     .crab-wiggle { animation: crabWalk 0.4s ease-in-out infinite alternate; }
     @keyframes crabWalk {
       0% { transform: translateY(0px) rotate(-3deg); }
       100% { transform: translateY(-6px) rotate(3deg); }
+    }
+
+    /* 🐙 たこ・クラゲ：ぷかぷか伸縮浮遊 */
+    .octopus-wiggle { animation: octopusFloat 3s ease-in-out infinite alternate; }
+    @keyframes octopusFloat {
+      0% { transform: translateY(0px) scaleY(1); }
+      50% { transform: translateY(-18px) scaleY(1.08) scaleX(0.95); }
+      100% { transform: translateY(6px) scaleY(0.95) scaleX(1.05); }
     }
     
     .fly-away .art-body {
@@ -92,13 +102,13 @@
       transition: top 8s linear, opacity 0.4s;
     }
 
-    /* ★ 食べた時の「モグモグ」「満腹」ポップアップ演出 ★ */
+    /* 食べた時のポップアップ演出 */
     .eat-effect {
       position: absolute;
-      font-size: 1.5rem;
+      font-size: 1.4rem;
       font-weight: bold;
       color: #ff4081;
-      background: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.92);
       padding: 4px 12px;
       border-radius: 20px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.2);
@@ -251,14 +261,12 @@
     function notifyCreaturesToEat(foodObj) {
       if (foodObj.isEaten) return;
       activeCreatures.forEach(creature => {
-        // ★ 満腹（5回食べた）生物には通知しない！
         if (!creature.isTargetingFood && !creature.isLeaving && !creature.isFull) {
           creature.targetFood(foodObj);
         }
       });
     }
 
-    // 生物ポップアップエフェクト生成関数
     function showEatEffect(x, y, text) {
       const effect = document.createElement('div');
       effect.className = 'eat-effect';
@@ -266,7 +274,7 @@
       effect.style.left = `${x}px`;
       effect.style.top = `${y}px`;
       document.body.appendChild(effect);
-      setTimeout(() => effect.remove(), 1400); // メモリクリーンアップ
+      setTimeout(() => effect.remove(), 1400);
     }
 
     function createFloatingArt(dataURL, type) {
@@ -275,7 +283,13 @@
 
       const img = document.createElement('img');
       img.src = dataURL;
-      img.className = `art-body ${type === 'crab' ? 'crab-wiggle' : 'fish-wiggle'}`;
+
+      // 3種類のCSSアニメーション割り当て
+      let animationClass = 'fish-wiggle';
+      if (type === 'crab') animationClass = 'crab-wiggle';
+      if (type === 'octopus') animationClass = 'octopus-wiggle';
+      img.className = `art-body ${animationClass}`;
+
       container.appendChild(img);
       document.body.appendChild(container);
 
@@ -284,6 +298,7 @@
         const baseH = img.offsetHeight || 180;
 
         let currentX = Math.random() * (window.innerWidth - baseW - 120) + 60;
+        // 🦀 カニは生成された瞬間から海底（Y固定）！
         let currentY = (type === 'crab') 
           ? window.innerHeight - baseH - 40 
           : Math.random() * (window.innerHeight - baseH - 200) + 60;
@@ -297,11 +312,10 @@
         let currentTargetFood = null;
         let isLeaving = false;
 
-        // ★ 成長状態の管理（5回で満腹）
         let eatenCount = 0;
         const maxEatCount = 5;
         let isFull = false;
-        let currentScale = 1.0; // 初期スケール
+        let currentScale = 1.0;
 
         const moveTo = (tx, ty, isFast = false) => {
           const currentW = baseW * currentScale;
@@ -309,9 +323,14 @@
 
           const maxX = Math.max(20, window.innerWidth - currentW - 40);
           const targetX = Math.min(Math.max(20, tx), maxX);
-          let targetY = (type === 'crab')
-            ? window.innerHeight - currentH - 40
-            : Math.min(Math.max(40, ty), window.innerHeight - currentH - 120);
+
+          // ★ カニ（crab）はY座標を「絶対に」海底に固定！
+          let targetY;
+          if (type === 'crab') {
+            targetY = window.innerHeight - currentH - 40;
+          } else {
+            targetY = Math.min(Math.max(40, ty), window.innerHeight - currentH - 120);
+          }
 
           const deltaX = targetX - currentX;
           const deltaY = targetY - currentY;
@@ -324,10 +343,9 @@
           container.style.top = `${targetY}px`;
 
           const flipX = deltaX > 0 ? -1 : 1;
-          let angle = (type === 'crab') ? 0 : Math.atan2(deltaY, Math.abs(deltaX)) * (180 / Math.PI) * 0.35;
-          if (flipX === -1 && type !== 'crab') angle = -angle;
+          let angle = (type === 'crab' || type === 'octopus') ? 0 : Math.atan2(deltaY, Math.abs(deltaX)) * (180 / Math.PI) * 0.35;
+          if (flipX === -1 && type === 'fish') angle = -angle;
 
-          // ★ 現在のスケール（成長度）を反映
           img.style.transform = `scaleX(${flipX}) rotate(${angle}deg) scale(${currentScale})`;
 
           currentX = targetX;
@@ -341,19 +359,21 @@
           element: container,
           get isTargetingFood() { return isTargetingFood; },
           get isLeaving() { return isLeaving; },
-          get isFull() { return isFull; }, // 満腹状態を公開
+          get isFull() { return isFull; },
 
           targetFood: (foodObj) => {
             if (isTargetingFood || isLeaving || isFull || foodObj.isEaten) return;
 
-            if (type === 'crab' && foodObj.y < window.innerHeight - 220) {
-              return; // カニは海底付近のみ
+            // 🦀 カニはエサが海底付近（底から180px以内）に落ちてくるまで動かない
+            if (type === 'crab' && foodObj.y < window.innerHeight - 180) {
+              return;
             }
 
             isTargetingFood = true;
             currentTargetFood = foodObj;
             clearTimeout(moveTimer);
 
+            // カニはX座標のみ近づき、Yは海底固定
             moveTo(foodObj.x - (baseW * currentScale) / 2, foodObj.y - (baseH * currentScale) / 2, true);
           }
         };
@@ -366,9 +386,18 @@
 
           const maxX = Math.max(30, window.innerWidth - currentW - 50);
           let nextX = Math.min(Math.max(30, Math.random() * maxX), maxX);
-          let nextY = (type === 'crab') 
-            ? window.innerHeight - currentH - (Math.random() * 30 + 30)
-            : Math.min(Math.max(50, Math.random() * (window.innerHeight - currentH - 140)), window.innerHeight - currentH - 120);
+          let nextY;
+
+          if (type === 'crab') {
+            // 🦀 カニは海底の砂地で横移動
+            nextY = window.innerHeight - currentH - 40;
+          } else if (type === 'octopus') {
+            // 🐙 たこ・クラゲは中層〜海底上あたりを漂う
+            nextY = Math.min(Math.max(100, Math.random() * (window.innerHeight - currentH - 100)), window.innerHeight - currentH - 100);
+          } else {
+            // 🐟 魚は水中全域
+            nextY = Math.min(Math.max(50, Math.random() * (window.innerHeight - currentH - 140)), window.innerHeight - currentH - 120);
+          }
 
           const durationMs = moveTo(nextX, nextY, false);
           const restTime = Math.random() * 1500 + 1000;
@@ -376,7 +405,7 @@
           moveTimer = setTimeout(swim, durationMs + restTime);
         };
 
-        // 🧠 AIフレーム監視（200ms周期）
+        // 🧠 AIフレーム監視（当たり判定距離を38pxに微調整）
         aiInterval = setInterval(() => {
           if (isLeaving) {
             clearInterval(aiInterval);
@@ -395,17 +424,17 @@
             const centerY = currentY + (baseH * currentScale) / 2;
             const dist = Math.hypot(currentTargetFood.x - centerX, currentTargetFood.y - centerY);
 
-            // ★ 食いつき（Hit）処理
-            if (dist < 70) {
+            // ★ 当たり判定を 38px に短縮（ぴったり重なった時のみ食べる）
+            if (dist < 38) {
               removeFood(currentTargetFood);
               isTargetingFood = false;
               currentTargetFood = null;
 
               eatenCount++;
-              currentScale += 0.08; // 1回食べるごとに約8%サイズアップ！
+              currentScale += 0.08;
 
               if (eatenCount >= maxEatCount) {
-                isFull = true; // 5回で満腹達成！
+                isFull = true;
                 showEatEffect(centerX, centerY - 20, "🈵 おなかいっぱい！💤");
               } else {
                 const messages = ["❤️ ぱくっ！", "✨ モグモグ！", "😋 おいしい！", "🎵 もぐもぐ！"];
@@ -444,7 +473,13 @@
           const currentW = baseW * currentScale;
           const currentH = baseH * currentScale;
           currentX = Math.min(currentX, window.innerWidth - currentW - 20);
-          currentY = Math.min(currentY, window.innerHeight - currentH - 20);
+          
+          if (type === 'crab') {
+            currentY = window.innerHeight - currentH - 40;
+          } else {
+            currentY = Math.min(currentY, window.innerHeight - currentH - 20);
+          }
+
           container.style.left = `${currentX}px`;
           container.style.top = `${currentY}px`;
         });
