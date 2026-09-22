@@ -54,10 +54,11 @@
 
     .art-item {
       position: absolute; z-index: 10; pointer-events: none;
+      will-change: left, top;
     }
     
     .art-body {
-      max-width: 350px; max-height: 350px;
+      max-width: 300px; max-height: 300px;
       filter: drop-shadow(0px 8px 12px rgba(0,0,0,0.2));
       transition: transform 0.8s ease-out, opacity 3s ease-in;
       transform-origin: center center;
@@ -117,7 +118,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, onChildAdded, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // Firebase設定[cite: 1, 2]
     const firebaseConfig = {
       apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
       authDomain: "espu9owen.firebaseapp.com",
@@ -172,7 +172,7 @@
       const food = document.createElement('div');
       food.className = 'food-item';
       
-      const startX = Math.random() * (window.innerWidth - 80) + 40;
+      const startX = Math.random() * (window.innerWidth - 100) + 50;
       food.style.left = `${startX}px`;
       food.style.top = `-30px`;
       document.body.appendChild(food);
@@ -231,10 +231,14 @@
       document.body.appendChild(container);
 
       img.onload = () => {
-        let currentX = window.innerWidth / 2 - img.width / 2;
+        const imgW = img.offsetWidth || 200;
+        const imgH = img.offsetHeight || 200;
+
+        // ★ 内部変数でのみ論理座標を保持（画面の見た目の位置に惑わされない）
+        let currentX = Math.max(50, window.innerWidth / 2 - imgW / 2);
         let currentY = (type === 'crab') 
-          ? window.innerHeight - img.height - 40 
-          : window.innerHeight / 2 - img.height / 2;
+          ? window.innerHeight - imgH - 40 
+          : Math.max(50, window.innerHeight / 2 - imgH / 2);
 
         container.style.left = `${currentX}px`;
         container.style.top = `${currentY}px`;
@@ -252,10 +256,11 @@
             creatureObj.isTargetingFood = true;
             clearTimeout(moveTimer);
 
-            const targetX = Math.max(10, foodObj.x - img.width / 2);
+            const maxX = Math.max(20, window.innerWidth - imgW - 40);
+            const targetX = Math.min(Math.max(20, foodObj.x - imgW / 2), maxX);
             let targetY = (type === 'crab')
-              ? window.innerHeight - img.height - 40
-              : Math.max(40, foodObj.y - img.height / 2);
+              ? window.innerHeight - imgH - 40
+              : Math.min(Math.max(40, foodObj.y - imgH / 2), window.innerHeight - imgH - 120);
 
             const deltaX = targetX - currentX;
             const deltaY = targetY - currentY;
@@ -272,21 +277,15 @@
 
             img.style.transform = `scaleX(${flipX}) rotate(${angle}deg)`;
 
+            // ★ 座標更新（論理値）
             currentX = targetX;
             currentY = targetY;
 
-            // ★ 完食後の動きの復帰処理を修正
             moveTimer = setTimeout(() => {
               removeFood(foodObj);
               isTargetingFood = false;
               creatureObj.isTargetingFood = false;
-
-              // 実際の最新位置を同期取得して復帰
-              const rect = container.getBoundingClientRect();
-              currentX = rect.left;
-              currentY = rect.top;
-
-              swim(); // 通常の遊泳・横歩きに戻る
+              swim(); // 通常遊泳へ復帰
             }, duration * 1000);
           }
         };
@@ -296,16 +295,12 @@
         const swim = () => {
           if (isTargetingFood) return;
 
-          // 最新の実位置を反映
-          const rect = container.getBoundingClientRect();
-          currentX = rect.left;
-          currentY = rect.top;
-
-          const maxX = Math.max(10, window.innerWidth - img.width - 20);
-          let nextX = Math.max(10, Math.random() * maxX);
+          // 画面外に出てしまわない安全な範囲を計算
+          const maxX = Math.max(30, window.innerWidth - imgW - 50);
+          let nextX = Math.min(Math.max(30, Math.random() * maxX), maxX);
           let nextY = (type === 'crab') 
-            ? window.innerHeight - img.height - (Math.random() * 30 + 30)
-            : Math.max(40, Math.random() * (window.innerHeight - img.height - 120));
+            ? window.innerHeight - imgH - (Math.random() * 30 + 30)
+            : Math.min(Math.max(50, Math.random() * (window.innerHeight - imgH - 140)), window.innerHeight - imgH - 120);
 
           const deltaX = nextX - currentX;
           const deltaY = nextY - currentY;
@@ -314,7 +309,6 @@
             ? Math.min(Math.max(distance / 120, 2), 5)
             : Math.min(Math.max(distance / 180, 3), 6);
 
-          // ★ 通常のイージングへ戻す
           container.style.transition = `left ${moveDuration}s linear, top ${moveDuration}s linear`;
           container.style.left = `${nextX}px`;
           container.style.top = `${nextY}px`;
@@ -325,6 +319,7 @@
 
           img.style.transform = `scaleX(${flipX}) rotate(${angle}deg)`;
 
+          // ★ 座標更新（論理値）
           currentX = nextX;
           currentY = nextY;
 
