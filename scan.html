@@ -10,139 +10,76 @@
 
   <style>
     html, body {
-      margin: 0;
-      padding: 0;
-      width: 100vw;
-      height: 100dvh;
+      margin: 0; padding: 0;
+      width: 100vw; height: 100dvh;
       overflow: hidden;
       background-color: #222;
       font-family: sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: space-between;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: space-between;
       color: #fff;
     }
 
     .header {
-      padding: 8px;
-      font-size: 1.1rem;
-      font-weight: bold;
-      text-align: center;
-      background: rgba(0,0,0,0.5);
-      width: 100%;
-      box-sizing: border-box;
+      padding: 8px; font-size: 1.1rem; font-weight: bold;
+      text-align: center; background: rgba(0,0,0,0.5); width: 100%; box-sizing: border-box;
     }
 
-    /* 種類選択ボタンエリア */
     .type-selector {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      padding: 6px;
-      width: 100%;
-      background: rgba(0,0,0,0.3);
-      box-sizing: border-box;
+      display: flex; gap: 12px; justify-content: center;
+      padding: 6px; width: 100%; background: rgba(0,0,0,0.3); box-sizing: border-box;
     }
 
     .btn-type {
-      font-size: 1rem;
-      padding: 8px 20px;
-      border-radius: 20px;
-      border: 2px solid transparent;
-      cursor: pointer;
-      font-weight: bold;
-      transition: 0.2s;
+      font-size: 1rem; padding: 8px 20px; border-radius: 20px;
+      border: 2px solid transparent; cursor: pointer; font-weight: bold; transition: 0.2s;
     }
     .btn-type.active {
-      border-color: #fff;
-      box-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
-      transform: scale(1.05);
+      border-color: #fff; box-shadow: 0 0 10px rgba(255, 255, 255, 0.6); transform: scale(1.05);
     }
     .btn-fish { background: #2196f3; color: #fff; }
     .btn-crab { background: #757575; color: #fff; }
 
     .camera-container {
-      position: relative;
-      width: 90vw;
-      height: 58dvh;
-      max-width: 800px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      overflow: hidden;
-      border-radius: 16px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      position: relative; width: 90vw; height: 58dvh; max-width: 800px;
+      display: flex; justify-content: center; align-items: center;
+      overflow: hidden; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
       background: #333;
     }
 
-    video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
+    video { width: 100%; height: 100%; object-fit: cover; }
 
-    /* 透過状態確認用の市松模様背景 */
     #previewCanvas {
-      display: none;
-      max-width: 90%;
-      max-height: 90%;
-      object-fit: contain;
+      display: none; max-width: 90%; max-height: 90%; object-fit: contain;
       background-color: #fff;
       background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), 
                         linear-gradient(-45deg, #ccc 25%, transparent 25%), 
                         linear-gradient(45deg, transparent 75%, #ccc 75%), 
                         linear-gradient(-45deg, transparent 75%, #ccc 75%);
-      background-size: 20px 20px;
-      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-      border-radius: 8px;
-      box-shadow: 0 0 15px rgba(0,0,0,0.5);
+      background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+      border-radius: 8px; box-shadow: 0 0 15px rgba(0,0,0,0.5);
     }
 
-    /* ガイド枠 */
     .guide-frame {
-      position: absolute;
-      width: 72vw;
-      height: 72vw;
-      max-width: 380px;
-      max-height: 380px;
-      border: 4px dashed #ff5252;
-      border-radius: 12px;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
-      pointer-events: none;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      box-sizing: border-box;
+      position: absolute; width: 72vw; height: 72vw; max-width: 380px; max-height: 380px;
+      border: 4px dashed #ff5252; border-radius: 12px;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5); pointer-events: none;
+      display: flex; justify-content: center; align-items: center; box-sizing: border-box;
     }
 
     .guide-text {
-      background: rgba(255, 82, 82, 0.85);
-      color: white;
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 0.95rem;
-      font-weight: bold;
+      background: rgba(255, 82, 82, 0.85); color: white; padding: 6px 14px;
+      border-radius: 20px; font-size: 0.95rem; font-weight: bold;
     }
 
     .controls {
-      padding: 12px;
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      width: 100%;
-      background: rgba(0,0,0,0.5);
-      box-sizing: border-box;
+      padding: 12px; display: flex; gap: 12px; justify-content: center;
+      width: 100%; background: rgba(0,0,0,0.5); box-sizing: border-box;
     }
 
     button {
-      font-size: 1.1rem;
-      padding: 12px 24px;
-      border-radius: 30px;
-      border: none;
-      cursor: pointer;
-      font-weight: bold;
-      transition: 0.1s;
+      font-size: 1.1rem; padding: 12px 24px; border-radius: 30px; border: none;
+      cursor: pointer; font-weight: bold; transition: 0.1s;
     }
     button:active { transform: scale(0.95); }
 
@@ -157,7 +94,6 @@
 
   <div class="header">しかくい赤枠の中にえを入れてね！</div>
 
-  <!-- 1. 生物タイプの選択 -->
   <div class="type-selector">
     <button id="btnFish" class="btn-type btn-fish active" onclick="selectType('fish')">🐟 さかな</button>
     <button id="btnCrab" class="btn-type btn-crab" onclick="selectType('crab')">🦀 カニ</button>
@@ -184,7 +120,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // Firebase設定
+    // Firebase設定[cite: 1, 2]
     const firebaseConfig = {
       apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
       authDomain: "espu9owen.firebaseapp.com",
@@ -207,9 +143,8 @@
     const ctx = processCanvas.getContext('2d', { willReadFrequently: true });
     
     let processedDataURL = null;
-    let selectedType = 'fish'; // 初期値はさかな
+    let selectedType = 'fish';
 
-    // 背面カメラ起動
     async function initCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -218,12 +153,11 @@
         });
         video.srcObject = stream;
       } catch (err) {
-        alert("カメラが起動できませんでした。アクセス許可を確認してください。");
+        alert("カメラが起動できませんでした。");
       }
     }
     initCamera();
 
-    // 選択タイプ切り替え関数
     window.selectType = function(type) {
       selectedType = type;
       const btnFish = document.getElementById('btnFish');
@@ -242,7 +176,6 @@
       }
     };
 
-    // 用紙の黒枠特定＆イラスト自動拡大抽出アルゴリズム[cite: 3, 4]
     window.captureAndCrop = function() {
       if (!video.videoWidth || !video.videoHeight) return;
 
@@ -290,92 +223,61 @@
       const imgData = ctx.getImageData(0, 0, cropW, cropH);
       const data = imgData.data;
 
-      // ----------------------------------------------------
-      // 1. 用紙の正方形「黒枠」の位置を自動特定[cite: 3, 4]
-      // ----------------------------------------------------
+      // 1. 用紙の正方形「黒枠」の位置を正確に検知[cite: 3, 4]
       const isBlackPixel = (x, y) => {
         const idx = (Math.floor(y) * cropW + Math.floor(x)) * 4;
         const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
-        return brightness < 110;
+        return brightness < 90; // 本物の黒線を厳しく判定
       };
 
-      let innerLeft = 0;
-      let innerRight = cropW;
-      let innerTop = 0;
-      let innerBottom = cropH;
-
-      const midY = cropH / 2;
-      const midX = cropW / 2;
+      let innerLeft = 0, innerRight = cropW, innerTop = 0, innerBottom = cropH;
+      const midY = cropH / 2, midX = cropW / 2;
 
       for (let x = 0; x < midX; x++) {
-        if (isBlackPixel(x, midY)) {
-          while (x < midX && isBlackPixel(x, midY)) x++;
-          innerLeft = x + 6;
-          break;
-        }
+        if (isBlackPixel(x, midY)) { while (x < midX && isBlackPixel(x, midY)) x++; innerLeft = x + 6; break; }
       }
       for (let x = cropW - 1; x > midX; x--) {
-        if (isBlackPixel(x, midY)) {
-          while (x > midX && isBlackPixel(x, midY)) x--;
-          innerRight = x - 6;
-          break;
-        }
+        if (isBlackPixel(x, midY)) { while (x > midX && isBlackPixel(x, midY)) x--; innerRight = x - 6; break; }
       }
       for (let y = 0; y < midY; y++) {
-        if (isBlackPixel(midX, y)) {
-          while (y < midY && isBlackPixel(midX, y)) y++;
-          innerTop = y + 6;
-          break;
-        }
+        if (isBlackPixel(midX, y)) { while (y < midY && isBlackPixel(midX, y)) y++; innerTop = y + 6; break; }
       }
       for (let y = cropH - 1; y > midY; y--) {
-        if (isBlackPixel(midX, y)) {
-          while (y > midY && isBlackPixel(midX, y)) y--;
-          innerBottom = y - 6;
-          break;
-        }
+        if (isBlackPixel(midX, y)) { while (y > midY && isBlackPixel(midX, y)) y--; innerBottom = y - 6; break; }
       }
 
-      // 黒枠が見つからなかった場合のセーフティ
       if (innerLeft === 0) innerLeft = Math.floor(cropW * 0.1);
       if (innerRight === cropW) innerRight = Math.floor(cropW * 0.9);
       if (innerTop === 0) innerTop = Math.floor(cropH * 0.1);
       if (innerBottom === cropH) innerBottom = Math.floor(cropH * 0.9);
 
-      // ----------------------------------------------------
-      // 2. 黒枠および黒枠より外側を消去＆イラストのみ抽出
-      // ----------------------------------------------------
       let minX = cropW, maxX = 0, minY = cropH, maxY = 0;
       let hasContent = false;
 
+      // 2. 影を除外し濃い黒線とカラー塗りのみ抽出
       for (let y = 0; y < cropH; y++) {
         for (let x = 0; x < cropW; x++) {
           const idx = (y * cropW + x) * 4;
-
           if (x < innerLeft || x > innerRight || y < innerTop || y > innerBottom) {
-            data[idx + 3] = 0;
-            continue;
+            data[idx + 3] = 0; continue;
           }
 
-          const r = data[idx];
-          const g = data[idx + 1];
-          const b = data[idx + 2];
-
+          const r = data[idx], g = data[idx + 1], b = data[idx + 2];
           const brightness = (r + g + b) / 3;
           const colorDiff = Math.max(r, g, b) - Math.min(r, g, b);
 
-          const isBlackLine = brightness < 120;
-          const isColoredLine = (colorDiff > 25) && (brightness < 220);
+          // ★ 黒ペンの条件を輝度85以下へ引き下げ（手の影100〜160を確実に弾く）
+          const isBlackLine = brightness < 85; 
+          // ★ 彩度条件を厳格化（薄暗いグレーの影を除外）
+          const isColoredLine = (colorDiff > 32) && (brightness < 210);
 
           if (isBlackLine || isColoredLine) {
             data[idx + 3] = 255;
-            if (x < minX) minX = x;
-            if (x > maxX) maxX = x;
-            if (y < minY) minY = y;
-            if (y > maxY) maxY = y;
+            if (x < minX) minX = x; if (x > maxX) maxX = x;
+            if (y < minY) minY = y; if (y > maxY) maxY = y;
             hasContent = true;
           } else {
-            data[idx + 3] = 0;
+            data[idx + 3] = 0; // 白地および影を100%消去
           }
         }
       }
@@ -386,38 +288,27 @@
       }
 
       const pad = 6;
-      minX = Math.max(0, minX - pad);
-      minY = Math.max(0, minY - pad);
-      maxX = Math.min(cropW, maxX + pad);
-      maxY = Math.min(cropH, maxY + pad);
+      minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
+      maxX = Math.min(cropW, maxX + pad); maxY = Math.min(cropH, maxY + pad);
 
-      const srcW = maxX - minX;
-      const srcH = maxY - minY;
-
+      const srcW = maxX - minX, srcH = maxY - minY;
       const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = cropW;
-      tempCanvas.height = cropH;
+      tempCanvas.width = cropW; tempCanvas.height = cropH;
       tempCanvas.getContext('2d').putImageData(imgData, 0, 0);
 
-      // 500x500の正方形の中央へ拡大配置
       const targetSize = 500;
-      previewCanvas.width = targetSize;
-      previewCanvas.height = targetSize;
+      previewCanvas.width = targetSize; previewCanvas.height = targetSize;
 
       const pCtx = previewCanvas.getContext('2d');
       pCtx.clearRect(0, 0, targetSize, targetSize);
 
       const fitScale = Math.min((targetSize - 20) / srcW, (targetSize - 20) / srcH);
-      const destW = srcW * fitScale;
-      const destH = srcH * fitScale;
-      const destX = (targetSize - destW) / 2;
-      const destY = (targetSize - destH) / 2;
+      const destW = srcW * fitScale, destH = srcH * fitScale;
+      const destX = (targetSize - destW) / 2, destY = (targetSize - destH) / 2;
 
       pCtx.drawImage(tempCanvas, minX, minY, srcW, srcH, destX, destY, destW, destH);
-
       processedDataURL = previewCanvas.toDataURL("image/png");
 
-      // 画面表示切替
       video.style.display = 'none';
       document.getElementById('guideFrame').style.display = 'none';
       previewCanvas.style.display = 'block';
@@ -437,22 +328,16 @@
       document.getElementById('btnSend').style.display = 'none';
     };
 
-    // Firebaseへ種別（type）付きでデータ送信
     window.sendToAquarium = function() {
       if (!processedDataURL) return;
 
       push(ref(db, 'art_stream'), { 
         dataURL: processedDataURL, 
-        type: selectedType, // ★ 生物の種類（fish / crab）を一緒に送信
+        type: selectedType,
         createdAt: Date.now() 
-      })
-      .then(() => {
+      }).then(() => {
         alert("すいぞくかんにおくったよ！");
         resetScan();
-      })
-      .catch((err) => {
-        alert("送信エラーが発生しました。");
-        console.error(err);
       });
     };
   </script>
