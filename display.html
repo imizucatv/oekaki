@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>みんなの水族館 - Smart AI Edition</title>
+  <title>みんなの水族館 - Perfect AI Edition</title>
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -215,7 +215,6 @@
       remove(snapshot.ref);
     });
 
-    // ★ エサの落下位置（端に行きすぎないよう左右160pxの安全マージンを設定）
     function dropFood() {
       const food = document.createElement('div');
       food.className = 'food-item';
@@ -342,6 +341,7 @@
           scaler.style.transform = `scaleX(${flipX}) rotate(${angle}deg) scale(${currentScale})`;
         };
 
+        // ★ 移動関数（カニはtop移動アニメーションを完全削除してY座標を絶対固定！）
         const moveTo = (tx, ty, isFast = false) => {
           const realPos = getRealPos();
           const currentW = baseW * currentScale;
@@ -350,22 +350,30 @@
           const maxX = Math.max(20, window.innerWidth - currentW - 40);
           const targetX = Math.min(Math.max(20, tx), maxX);
 
-          let targetY;
-          if (type === 'crab') {
-            targetY = window.innerHeight - currentH - 40;
-          } else {
-            targetY = Math.min(Math.max(40, ty), window.innerHeight - currentH - 120);
-          }
-
           const deltaX = targetX - realPos.left;
-          const deltaY = targetY - realPos.top;
-          const distance = Math.hypot(deltaX, deltaY);
-          const speed = isFast ? 220 : 140;
-          const duration = Math.min(Math.max(distance / speed, 1.2), 5);
+          let deltaY = 0;
+          let duration = 0;
 
-          container.style.transition = `left ${duration}s ${isFast ? 'ease-in-out' : 'linear'}, top ${duration}s ${isFast ? 'ease-in-out' : 'linear'}`;
-          container.style.left = `${targetX}px`;
-          container.style.top = `${targetY}px`;
+          if (type === 'crab') {
+            // 🦀 カニ：Y軸の移動アニメーションを排除！leftのみスムーズに移動
+            const targetY = window.innerHeight - currentH - 40;
+            const distance = Math.abs(deltaX);
+            duration = Math.min(Math.max(distance / (isFast ? 220 : 140), 1.0), 4.5);
+
+            container.style.transition = `left ${duration}s ${isFast ? 'ease-in-out' : 'linear'}`;
+            container.style.left = `${targetX}px`;
+            container.style.top = `${targetY}px`; // Y座標は直接セット（Transitionなし）
+          } else {
+            // 🐟 魚・タコ：2D移動
+            const targetY = Math.min(Math.max(40, ty), window.innerHeight - currentH - 120);
+            deltaY = targetY - realPos.top;
+            const distance = Math.hypot(deltaX, deltaY);
+            duration = Math.min(Math.max(distance / (isFast ? 220 : 140), 1.2), 5);
+
+            container.style.transition = `left ${duration}s ${isFast ? 'ease-in-out' : 'linear'}, top ${duration}s ${isFast ? 'ease-in-out' : 'linear'}`;
+            container.style.left = `${targetX}px`;
+            container.style.top = `${targetY}px`;
+          }
 
           const flipX = deltaX > 0 ? -1 : 1;
           let angle = (type === 'crab' || type === 'octopus') ? 0 : Math.atan2(deltaY, Math.abs(deltaX)) * (180 / Math.PI) * 0.35;
@@ -379,10 +387,12 @@
         const targetFood = (foodObj) => {
           if (isTargetingFood || isLeaving || isFull || foodObj.isEaten) return;
 
+          // ★ 一心を尽くして狙う：一度セットしたらエサが消えるまで絶対ロックオン！
           isTargetingFood = true;
           currentTargetFood = foodObj;
           clearTimeout(moveTimer);
 
+          // 一気にエサの位置までスーッと一発移動開始！
           moveTo(foodObj.x - (baseW * currentScale) / 2, foodObj.y - (baseH * currentScale) / 2, true);
         };
 
@@ -410,8 +420,7 @@
           moveTimer = setTimeout(swim, durationMs + restTime);
         };
 
-        // 🧠 リアルタイム高精度AI（一番近いエサの探索 ＆ カニ専用Hitbox判定）
-        let targetUpdateCounter = 0;
+        // 🧠 150ms 周期のAI監視
         aiInterval = setInterval(() => {
           if (isLeaving) {
             clearInterval(aiInterval);
@@ -420,7 +429,7 @@
 
           const realPos = getRealPos();
 
-          // ★ 1. まだエサを追いかけていない場合 ➔ 自分に一番「近い」エサを検索！
+          // ★ 1. 未ターゲット時：全エサの中から一番自分に「近い」エサを1個選んでロックオン！
           if (!isTargetingFood && !isFull && activeFoods.length > 0) {
             let closestFood = null;
             let minDistance = Infinity;
@@ -428,7 +437,7 @@
             activeFoods.forEach(food => {
               if (food.isEaten) return;
 
-              // 🦀 カニはエサが海底付近（底から220px以内）に届くまで反応しない
+              // カニは海底付近（底から220px以内）に落ちてきたエサのみ対象
               if (type === 'crab' && food.y < window.innerHeight - 220) return;
 
               const dist = Math.hypot(food.x - realPos.x, food.y - realPos.y);
@@ -443,8 +452,9 @@
             }
           }
 
-          // ★ 2. エサを追跡中の場合 ➔ 距離チェック＆食いつき判定
+          // ★ 2. ターゲット追尾中：一心を尽くしてそのエサだけを狙い続ける（他には目移りしない）
           if (isTargetingFood && currentTargetFood) {
+            // 他の魚が先に食べた場合 ➔ 即時ロックオン解除して優雅な泳ぎに戻る
             if (currentTargetFood.isEaten) {
               isTargetingFood = false;
               currentTargetFood = null;
@@ -452,16 +462,15 @@
               return;
             }
 
-            // ★ 当たり判定（Hitbox）の計算：カニと魚で柔軟に切り替え
             let isHit = false;
             if (type === 'crab') {
-              // 🦀 カニ：X方向のズレが45px以内 ＆ エサが海底（底から180px以内）に到達したらHit！
+              // 🦀 カニ：横ズレ45px以内 ＆ エサが海底（底から180px以内）に到達したらパクッ！
               const dx = Math.abs(currentTargetFood.x - realPos.x);
               if (dx < 45 && currentTargetFood.y >= window.innerHeight - 180) {
                 isHit = true;
               }
             } else {
-              // 🐟 魚・クラゲ：実座標の中心距離が45px以内ならHit！
+              // 🐟 魚・タコ：2D距離が45px以内ならパクッ！
               const dist = Math.hypot(currentTargetFood.x - realPos.x, currentTargetFood.y - realPos.y);
               if (dist < 45) {
                 isHit = true;
@@ -492,12 +501,6 @@
               }
 
               moveTimer = setTimeout(swim, 600);
-            } else {
-              // 追跡ターゲット位置の定期更新
-              targetUpdateCounter++;
-              if (targetUpdateCounter % 3 === 0) {
-                moveTo(currentTargetFood.x - (baseW * currentScale) / 2, currentTargetFood.y - (baseH * currentScale) / 2, true);
-              }
             }
           }
         }, 150);
