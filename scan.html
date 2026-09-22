@@ -71,17 +71,21 @@
       box-shadow: 0 0 15px rgba(0,0,0,0.5);
     }
 
+    /* ★ 画面上の正方形枠ガイド ★ */
     .guide-frame {
       position: absolute;
-      width: 80%;
-      height: 80%;
+      width: 70vw;
+      height: 70vw;
+      max-width: 400px;
+      max-height: 400px;
       border: 4px dashed #ff5252;
       border-radius: 12px;
-      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
       pointer-events: none;
       display: flex;
       justify-content: center;
       align-items: center;
+      box-sizing: border-box;
     }
 
     .guide-text {
@@ -123,9 +127,9 @@
 </head>
 <body>
 
-  <div class="header">赤わくの中にえを入れてね！</div>
+  <div class="header">しかくい赤枠の中にえを入れてね！</div>
 
-  <div class="camera-container">
+  <div class="camera-container" id="cameraContainer">
     <video id="video" autoplay playsinline muted></video>
     <canvas id="previewCanvas"></canvas>
     
@@ -146,7 +150,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // Firebase設定
+    // Firebase設定[cite: 1, 2]
     const firebaseConfig = {
       apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
       authDomain: "espu9owen.firebaseapp.com",
@@ -162,6 +166,8 @@
     const db = getDatabase(app);
 
     const video = document.getElementById('video');
+    const cameraContainer = document.getElementById('cameraContainer');
+    const guideFrame = document.getElementById('guideFrame');
     const processCanvas = document.getElementById('processCanvas');
     const previewCanvas = document.getElementById('previewCanvas');
     const ctx = processCanvas.getContext('2d', { willReadFrequently: true });
@@ -181,27 +187,56 @@
     }
     initCamera();
 
-    // 高精度スキャン＆影除去アルゴリズム
+    // ★ 視覚的な赤枠と画像解像度の厳密な位置補正関数
     window.captureAndCrop = function() {
-      if (!video.videoWidth) return;
+      if (!video.videoWidth || !video.videoHeight) return;
 
-      // 1. 全画面カメラ映像を一度保持
+      // 1. 画面上の要素の位置・サイズを取得
+      const containerRect = cameraContainer.getBoundingClientRect();
+      const guideRect = guideFrame.getBoundingClientRect();
+
+      const vWidth = video.videoWidth;
+      const vHeight = video.videoHeight;
+
+      // 2. object-fit: cover によるカメラ映像の拡大・ズレ倍率を計算
+      const containerRatio = containerRect.width / containerRect.height;
+      const videoRatio = vWidth / vHeight;
+
+      let renderWidth, renderHeight, offsetX, offsetY;
+
+      if (containerRatio > videoRatio) {
+        renderWidth = containerRect.width;
+        renderHeight = containerRect.width / videoRatio;
+        offsetX = 0;
+        offsetY = (renderHeight - containerRect.height) / 2;
+      } else {
+        renderWidth = containerRect.height * videoRatio;
+        renderHeight = containerRect.height;
+        offsetX = (renderWidth - containerRect.width) / 2;
+        offsetY = 0;
+      }
+
+      const scale = vWidth / renderWidth;
+
+      const guideLeft = guideRect.left - containerRect.left;
+      const guideTop = guideRect.top - containerRect.top;
+
+      // 3. カメラのピクセルデータ上で赤枠の中身だけを正確に計算
+      const cropX = Math.floor((guideLeft + offsetX) * scale);
+      const cropY = Math.floor((guideTop + offsetY) * scale);
+      const cropW = Math.floor(guideRect.width * scale);
+      const cropH = Math.floor(guideRect.height * scale);
+
+      // 4. 全画面キャプチャから赤枠内だけを切り抜き
       const rawCanvas = document.createElement('canvas');
-      rawCanvas.width = video.videoWidth;
-      rawCanvas.height = video.videoHeight;
+      rawCanvas.width = vWidth;
+      rawCanvas.height = vHeight;
       const rawCtx = rawCanvas.getContext('2d');
       rawCtx.drawImage(video, 0, 0);
 
-      // 2. 赤枠（中央80%）の位置とサイズを計算
-      const cropW = Math.floor(rawCanvas.width * 0.8);
-      const cropH = Math.floor(rawCanvas.height * 0.8);
-      const startX = Math.floor((rawCanvas.width - cropW) / 2);
-      const startY = Math.floor((rawCanvas.height - cropH) / 2);
-
-      // 3. 赤枠内のみを厳密に抽出（赤枠外を物理的に100%カット）
       processCanvas.width = cropW;
       processCanvas.height = cropH;
-      ctx.drawImage(rawCanvas, startX, startY, cropW, cropH, 0, 0, cropW, cropH);
+      ctx.drawImage(rawCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
       const imgData = ctx.getImageData(0, 0, cropW, cropH);
       const data = imgData.data;
@@ -209,7 +244,7 @@
       let minX = cropW, maxX = 0, minY = cropH, maxY = 0;
       let hasContent = false;
 
-      // 4. ピクセルごとの「ペン線」「カラー線」「影/白紙」の自動選別
+      // 5. 赤枠内のみを対象に「影の除去」と「イラスト検出」
       for (let y = 0; y < cropH; y++) {
         for (let x = 0; x < cropW; x++) {
           const idx = (y * cropW + x) * 4;
@@ -220,31 +255,29 @@
           const brightness = (r + g + b) / 3;
           const colorDiff = Math.max(r, g, b) - Math.min(r, g, b);
 
-          // 【判定ルール】
-          // ・黒ペン/濃い線: 輝度が 110 未満（影より十分に黒い）
-          // ・カラーペン/クレヨン: 彩度(colorDiff)が 32 以上（明確な色味がある）
+          // 影（明るいグレー）を除外し、黒ペン・カラー線のみ抽出
           const isBlackLine = brightness < 110;
           const isColoredLine = (colorDiff > 32) && (brightness < 210);
 
           if (isBlackLine || isColoredLine) {
-            data[idx + 3] = 255; // イラストとして採用
+            data[idx + 3] = 255;
             if (x < minX) minX = x;
             if (x > maxX) maxX = x;
             if (y < minY) minY = y;
             if (y > maxY) maxY = y;
             hasContent = true;
           } else {
-            data[idx + 3] = 0; // 影・紙の白地はすべて完全消去
+            data[idx + 3] = 0; // 白紙・影は消去
           }
         }
       }
 
       if (!hasContent || minX >= maxX || minY >= maxY) {
-        alert("えが見つからなかったよ！サインペンやクーピーで濃く描いてね。");
+        alert("赤枠の中に絵が見つからなかったよ！サインペンやクーピーで濃く描いてね。");
         return;
       }
 
-      // バウンディングボックスに10pxの余白を追加
+      // 6. イラストの周りの余白で最終カット
       const pad = 10;
       minX = Math.max(0, minX - pad);
       minY = Math.max(0, minY - pad);
@@ -254,7 +287,6 @@
       const finalWidth = maxX - minX;
       const finalHeight = maxY - minY;
 
-      // 抽出した絵の範囲だけをプレビュー用Canvasへ描画
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = cropW;
       tempCanvas.height = cropH;
@@ -269,7 +301,7 @@
 
       processedDataURL = previewCanvas.toDataURL("image/png");
 
-      // 表示切り替え
+      // 画面表示切替
       video.style.display = 'none';
       document.getElementById('guideFrame').style.display = 'none';
       previewCanvas.style.display = 'block';
