@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>みんなの水族館 - Perfect Edition</title>
+  <title>みんなの水族館 - Complete Edition</title>
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -58,9 +58,9 @@
     }
     
     .art-body {
-      max-width: 280px; max-height: 280px;
+      max-width: 250px; max-height: 250px;
       filter: drop-shadow(0px 8px 12px rgba(0,0,0,0.2));
-      transition: transform 0.8s ease-out, opacity 3s ease-in;
+      transition: transform 0.6s ease-out, opacity 3s ease-in;
       transform-origin: center center;
     }
 
@@ -90,6 +90,29 @@
       z-index: 15;
       box-shadow: 0 4px 8px rgba(0,0,0,0.3);
       transition: top 8s linear, opacity 0.4s;
+    }
+
+    /* ★ 食べた時の「モグモグ」「満腹」ポップアップ演出 ★ */
+    .eat-effect {
+      position: absolute;
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #ff4081;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 4px 12px;
+      border-radius: 20px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      pointer-events: none;
+      z-index: 20;
+      white-space: nowrap;
+      animation: popAndFloat 1.4s ease-out forwards;
+    }
+
+    @keyframes popAndFloat {
+      0% { transform: translate(-50%, 0) scale(0.4); opacity: 0; }
+      20% { transform: translate(-50%, -15px) scale(1.2); opacity: 1; }
+      70% { transform: translate(-50%, -30px) scale(1); opacity: 1; }
+      100% { transform: translate(-50%, -45px) scale(0.8); opacity: 0; }
     }
   </style>
 </head>
@@ -135,7 +158,6 @@
     const activeCreatures = [];
     const activeFoods = [];
 
-    // ダブルクリックでフルスクリーン切り替え
     document.body.addEventListener('dblclick', () => {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(() => {});
@@ -144,7 +166,6 @@
       }
     });
 
-    // 泡生成
     const bubblesContainer = document.getElementById('bubbles-container');
     function createBubble() {
       const bubble = document.createElement('div');
@@ -159,20 +180,17 @@
     }
     setInterval(createBubble, 800);
 
-    // 新しい絵を受信
     onChildAdded(ref(db, 'art_stream'), (snapshot) => {
       const data = snapshot.val();
       createFloatingArt(data.dataURL, data.type || 'fish');
       remove(snapshot.ref);
     });
 
-    // エサを受信
     onChildAdded(ref(db, 'feed_stream'), (snapshot) => {
       dropFood();
       remove(snapshot.ref);
     });
 
-    // ★ エサ落下物理ロジック
     function dropFood() {
       const food = document.createElement('div');
       food.className = 'food-item';
@@ -198,7 +216,6 @@
       };
       activeFoods.push(foodObj);
 
-      // Y座標の正確な物理追跡ループ
       const interval = setInterval(() => {
         if (foodObj.isEaten) {
           clearInterval(interval);
@@ -234,13 +251,24 @@
     function notifyCreaturesToEat(foodObj) {
       if (foodObj.isEaten) return;
       activeCreatures.forEach(creature => {
-        if (!creature.isTargetingFood && !creature.isLeaving) {
+        // ★ 満腹（5回食べた）生物には通知しない！
+        if (!creature.isTargetingFood && !creature.isLeaving && !creature.isFull) {
           creature.targetFood(foodObj);
         }
       });
     }
 
-    // ★ 生物AI ＆ インテリジェント遊泳エンジン
+    // 生物ポップアップエフェクト生成関数
+    function showEatEffect(x, y, text) {
+      const effect = document.createElement('div');
+      effect.className = 'eat-effect';
+      effect.innerText = text;
+      effect.style.left = `${x}px`;
+      effect.style.top = `${y}px`;
+      document.body.appendChild(effect);
+      setTimeout(() => effect.remove(), 1400); // メモリクリーンアップ
+    }
+
     function createFloatingArt(dataURL, type) {
       const container = document.createElement('div');
       container.className = 'art-item';
@@ -252,13 +280,13 @@
       document.body.appendChild(container);
 
       img.onload = () => {
-        const imgW = img.offsetWidth || 180;
-        const imgH = img.offsetHeight || 180;
+        const baseW = img.offsetWidth || 180;
+        const baseH = img.offsetHeight || 180;
 
-        let currentX = Math.random() * (window.innerWidth - imgW - 120) + 60;
+        let currentX = Math.random() * (window.innerWidth - baseW - 120) + 60;
         let currentY = (type === 'crab') 
-          ? window.innerHeight - imgH - 40 
-          : Math.random() * (window.innerHeight - imgH - 200) + 60;
+          ? window.innerHeight - baseH - 40 
+          : Math.random() * (window.innerHeight - baseH - 200) + 60;
 
         container.style.left = `${currentX}px`;
         container.style.top = `${currentY}px`;
@@ -269,18 +297,26 @@
         let currentTargetFood = null;
         let isLeaving = false;
 
-        // 目標点へ移動する統一関数
+        // ★ 成長状態の管理（5回で満腹）
+        let eatenCount = 0;
+        const maxEatCount = 5;
+        let isFull = false;
+        let currentScale = 1.0; // 初期スケール
+
         const moveTo = (tx, ty, isFast = false) => {
-          const maxX = Math.max(20, window.innerWidth - imgW - 40);
+          const currentW = baseW * currentScale;
+          const currentH = baseH * currentScale;
+
+          const maxX = Math.max(20, window.innerWidth - currentW - 40);
           const targetX = Math.min(Math.max(20, tx), maxX);
           let targetY = (type === 'crab')
-            ? window.innerHeight - imgH - 40
-            : Math.min(Math.max(40, ty), window.innerHeight - imgH - 120);
+            ? window.innerHeight - currentH - 40
+            : Math.min(Math.max(40, ty), window.innerHeight - currentH - 120);
 
           const deltaX = targetX - currentX;
           const deltaY = targetY - currentY;
           const distance = Math.hypot(deltaX, deltaY);
-          const speed = isFast ? 220 : 150; // 食いつき時はスピードアップ
+          const speed = isFast ? 220 : 150;
           const duration = Math.min(Math.max(distance / speed, 1.2), 5);
 
           container.style.transition = `left ${duration}s ${isFast ? 'ease-in-out' : 'linear'}, top ${duration}s ${isFast ? 'ease-in-out' : 'linear'}`;
@@ -291,7 +327,8 @@
           let angle = (type === 'crab') ? 0 : Math.atan2(deltaY, Math.abs(deltaX)) * (180 / Math.PI) * 0.35;
           if (flipX === -1 && type !== 'crab') angle = -angle;
 
-          img.style.transform = `scaleX(${flipX}) rotate(${angle}deg)`;
+          // ★ 現在のスケール（成長度）を反映
+          img.style.transform = `scaleX(${flipX}) rotate(${angle}deg) scale(${currentScale})`;
 
           currentX = targetX;
           currentY = targetY;
@@ -304,32 +341,34 @@
           element: container,
           get isTargetingFood() { return isTargetingFood; },
           get isLeaving() { return isLeaving; },
+          get isFull() { return isFull; }, // 満腹状態を公開
 
           targetFood: (foodObj) => {
-            if (isTargetingFood || isLeaving || foodObj.isEaten) return;
+            if (isTargetingFood || isLeaving || isFull || foodObj.isEaten) return;
 
-            // 🦀 物理制約：カニはエサが海底付近（画面下部220px）に届くまで手が出せない！
             if (type === 'crab' && foodObj.y < window.innerHeight - 220) {
-              return;
+              return; // カニは海底付近のみ
             }
 
             isTargetingFood = true;
             currentTargetFood = foodObj;
             clearTimeout(moveTimer);
 
-            moveTo(foodObj.x - imgW / 2, foodObj.y - imgH / 2, true);
+            moveTo(foodObj.x - (baseW * currentScale) / 2, foodObj.y - (baseH * currentScale) / 2, true);
           }
         };
 
-        // 気ままな通常遊泳
         const swim = () => {
           if (isTargetingFood || isLeaving) return;
 
-          const maxX = Math.max(30, window.innerWidth - imgW - 50);
+          const currentW = baseW * currentScale;
+          const currentH = baseH * currentScale;
+
+          const maxX = Math.max(30, window.innerWidth - currentW - 50);
           let nextX = Math.min(Math.max(30, Math.random() * maxX), maxX);
           let nextY = (type === 'crab') 
-            ? window.innerHeight - imgH - (Math.random() * 30 + 30)
-            : Math.min(Math.max(50, Math.random() * (window.innerHeight - imgH - 140)), window.innerHeight - imgH - 120);
+            ? window.innerHeight - currentH - (Math.random() * 30 + 30)
+            : Math.min(Math.max(50, Math.random() * (window.innerHeight - currentH - 140)), window.innerHeight - currentH - 120);
 
           const durationMs = moveTo(nextX, nextY, false);
           const restTime = Math.random() * 1500 + 1000;
@@ -337,7 +376,7 @@
           moveTimer = setTimeout(swim, durationMs + restTime);
         };
 
-        // 🧠 AIフレーム監視（200msごとに食いつき当たり判定とターゲット状態を監視）
+        // 🧠 AIフレーム監視（200ms周期）
         aiInterval = setInterval(() => {
           if (isLeaving) {
             clearInterval(aiInterval);
@@ -345,7 +384,6 @@
           }
 
           if (isTargetingFood && currentTargetFood) {
-            // 他の魚が先に食べた場合 -> 追跡即時キャンセルして気ままな遊泳に戻る
             if (currentTargetFood.isEaten) {
               isTargetingFood = false;
               currentTargetFood = null;
@@ -353,19 +391,31 @@
               return;
             }
 
-            // 当たり判定計算（65px以内に近づいたらパクッと食べる）
-            const centerX = currentX + imgW / 2;
-            const centerY = currentY + imgH / 2;
+            const centerX = currentX + (baseW * currentScale) / 2;
+            const centerY = currentY + (baseH * currentScale) / 2;
             const dist = Math.hypot(currentTargetFood.x - centerX, currentTargetFood.y - centerY);
 
-            if (dist < 65) {
+            // ★ 食いつき（Hit）処理
+            if (dist < 70) {
               removeFood(currentTargetFood);
               isTargetingFood = false;
               currentTargetFood = null;
-              moveTimer = setTimeout(swim, 600); // 満足してすぐまた泳ぎ出す
+
+              eatenCount++;
+              currentScale += 0.08; // 1回食べるごとに約8%サイズアップ！
+
+              if (eatenCount >= maxEatCount) {
+                isFull = true; // 5回で満腹達成！
+                showEatEffect(centerX, centerY - 20, "🈵 おなかいっぱい！💤");
+              } else {
+                const messages = ["❤️ ぱくっ！", "✨ モグモグ！", "😋 おいしい！", "🎵 もぐもぐ！"];
+                const msg = messages[Math.floor(Math.random() * messages.length)];
+                showEatEffect(centerX, centerY - 20, msg);
+              }
+
+              moveTimer = setTimeout(swim, 600);
             } else {
-              // 落下するエサの最新位置へ目標更新
-              moveTo(currentTargetFood.x - imgW / 2, currentTargetFood.y - imgH / 2, true);
+              moveTo(currentTargetFood.x - (baseW * currentScale) / 2, currentTargetFood.y - (baseH * currentScale) / 2, true);
             }
           }
         }, 200);
@@ -373,7 +423,6 @@
         activeCreatures.push(creatureObj);
         setTimeout(swim, 300);
 
-        // 2分後の退場ロジック（完全クリーンアップ）
         setTimeout(() => {
           isLeaving = true;
           isTargetingFood = false;
@@ -390,11 +439,12 @@
           setTimeout(() => container.remove(), 3000);
         }, 120000);
 
-        // 画面リサイズ・全画面切り替え時の補正
         window.addEventListener('resize', () => {
           if (isLeaving) return;
-          currentX = Math.min(currentX, window.innerWidth - imgW - 20);
-          currentY = Math.min(currentY, window.innerHeight - imgH - 20);
+          const currentW = baseW * currentScale;
+          const currentH = baseH * currentScale;
+          currentX = Math.min(currentX, window.innerWidth - currentW - 20);
+          currentY = Math.min(currentY, window.innerHeight - currentH - 20);
           container.style.left = `${currentX}px`;
           container.style.top = `${currentY}px`;
         });
