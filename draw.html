@@ -2,129 +2,176 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>お絵描きアプリ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>じゆうにお絵描きキャンバス</title>
 
-  <!-- ★ アプリ化（フルスクリーン化）用の設定 ★ -->
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="お絵描き">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#fce4ec">
 
   <style>
-    /* iOS/Androidのアドレスバー伸縮に対応した高さ設定＆スクロール防止 */
     html, body {
-      margin: 0;
-      padding: 0;
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
+      margin: 0; padding: 0;
+      width: 100vw; height: 100dvh;
       overflow: hidden;
-      overscroll-behavior: none;
-      background-color: #fce4ec;
+      background-color: #e0f7fa;
       font-family: sans-serif;
-      display: flex;
-      flex-direction: column;
-    }
-    
-    .toolbar { 
-      background: #fff; 
-      padding: 6px 10px; 
-      display: flex; 
-      justify-content: center; 
-      align-items: center;
-      gap: 6px; 
-      flex-wrap: wrap; 
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
-      z-index: 10; 
-      flex-shrink: 0;
-    }
-    
-    .tool-group { 
-      display: flex; 
-      align-items: center; 
-      gap: 4px; 
-      background: #f5f5f5; 
-      padding: 4px 8px; 
-      border-radius: 20px; 
-    }
-    
-    input[type="color"] { width: 34px; height: 34px; border: none; cursor: pointer; background: none; padding: 0; }
-    input[type="range"] { width: 60px; cursor: pointer; }
-    
-    button { 
-      font-size: 0.85rem; 
-      padding: 6px 10px; 
-      border-radius: 16px; 
-      border: none; 
-      cursor: pointer; 
-      font-weight: bold; 
-      transition: 0.1s; 
-      white-space: nowrap;
-    }
-    button:active { transform: scale(0.95); }
-    
-    button.active { outline: 3px solid #2196f3; box-shadow: 0 0 6px rgba(33, 150, 243, 0.5); }
-    
-    .btn-pen { background: #333; color: #fff; }
-    .btn-fill { background: #ff9800; color: #fff; }
-    .btn-eraser { background: #cfd8dc; color: #333; }
-    .btn-undo { background: #9c27b0; color: #fff; }
-    .btn-clear { background: #ff5252; color: #fff; }
-    .btn-send { 
-      background: #4caf50; 
-      color: #fff; 
-      font-size: 1rem; 
-      padding: 8px 16px; 
-      box-shadow: 0 3px 6px rgba(76, 175, 80, 0.3); 
-      border-radius: 24px; 
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: space-between;
+      user-select: none;
     }
 
-    .canvas-wrapper { 
-      flex: 1; 
-      min-height: 0;
-      min-width: 0;
-      display: flex; 
-      justify-content: center; 
-      align-items: center; 
-      padding: 10px; 
-      box-sizing: border-box; 
-      width: 100%;
-      height: 100%;
+    .header {
+      padding: max(8px, 1vh); font-size: 1.1rem; font-weight: bold;
+      text-align: center; background: rgba(255,255,255,0.8); width: 100%; box-sizing: border-box;
+      color: #004d40;
     }
-    
-    canvas { 
-      background-color: #e8e8e8;
-      border-radius: 12px; 
-      box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
-      touch-action: none; 
-      max-width: 100%; 
-      max-height: 100%; 
-      object-fit: contain;
-      cursor: crosshair; 
+
+    .canvas-container {
+      position: relative; width: 92vw; height: 58dvh; max-width: 800px;
+      display: flex; justify-content: center; align-items: center;
+      background: #ffffff; border-radius: 20px;
+      box-shadow: 0 6px 20px rgba(0, 105, 92, 0.15);
+      border: 4px solid #80deea; touch-action: none;
+    }
+
+    canvas {
+      width: 100%; height: 100%; border-radius: 16px;
+      cursor: crosshair;
+    }
+
+    /* ツールバー＆カラーパレット */
+    .toolbar {
+      width: 92vw; max-width: 800px;
+      display: flex; flex-direction: column; gap: 8px;
+      align-items: center; padding: 6px;
+    }
+
+    .colors {
+      display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    }
+
+    .color-btn {
+      width: 36px; height: 36px; border-radius: 50%; border: 3px solid #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2); cursor: pointer; transition: transform 0.1s;
+    }
+    .color-btn.active {
+      transform: scale(1.25); border-color: #004d40;
+    }
+
+    .controls {
+      padding: 10px; display: flex; gap: 12px; justify-content: center;
+      width: 100%; box-sizing: border-box;
+    }
+
+    button {
+      font-size: 1.1rem; padding: 10px 20px; border-radius: 30px; border: none;
+      cursor: pointer; font-weight: bold; transition: 0.1s; outline: none;
+    }
+    button:active { transform: scale(0.95); }
+
+    .btn-clear { background: #757575; color: #fff; }
+    .btn-send { background: #ab47bc; color: #fff; font-size: 1.2rem; padding: 12px 28px; box-shadow: 0 4px 10px rgba(171,71,188,0.3); }
+
+    /* ★ マナー案内＆生物選択モーダル ★ */
+    .modal-overlay {
+      display: none;
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
+      background: rgba(0,0,0,0.85); z-index: 100;
+      flex-direction: column; align-items: center; justify-content: center;
+      gap: 16px; padding: 20px; box-sizing: border-box;
+    }
+
+    .modal-card {
+      background: #ffffff; border-radius: 24px; padding: 20px;
+      max-width: 400px; width: 90%; text-align: center; color: #333;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    }
+
+    .modal-notice {
+      background: #fff3e0; border: 2px dashed #ff9800; border-radius: 16px;
+      padding: 12px; font-size: 0.95rem; color: #e65100; font-weight: bold;
+      line-height: 1.4; margin-bottom: 16px;
+    }
+
+    .modal-title {
+      font-size: 1.3rem; font-weight: bold; color: #004d40; margin-bottom: 12px;
+    }
+
+    .modal-buttons {
+      display: flex; flex-direction: column; gap: 10px; width: 100%;
+    }
+
+    .btn-choice {
+      font-size: 1.2rem; padding: 14px; border-radius: 30px; border: none;
+      color: #fff; font-weight: bold; cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: transform 0.1s;
+    }
+    .btn-choice:active { transform: scale(0.95); }
+    .choice-fish { background: #2196f3; }
+    .choice-crab { background: #ff9800; }
+    .choice-octopus { background: #e91e63; }
+    .btn-back { background: #b0bec5; color: #37474f; margin-top: 6px; font-size: 0.95rem; padding: 8px; }
+
+    #loadingOverlay {
+      display: none;
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
+      background: rgba(0,0,0,0.6); z-index: 200;
+      flex-direction: column; align-items: center; justify-content: center;
+      color: #fff; font-size: 1.4rem; font-weight: bold;
     }
   </style>
 </head>
 <body>
 
-  <div class="toolbar">
-    <div class="tool-group">
-      <input type="color" id="colorPicker" value="#ff0000">
-      <input type="range" id="sizePicker" min="2" max="40" value="8">
-    </div>
-    <div class="tool-group">
-      <button id="btnPen" class="btn-pen active" onclick="setMode('pen')">ペン</button>
-      <button id="btnFill" class="btn-fill" onclick="setMode('fill')">塗りつぶし</button>
-      <button id="btnEraser" class="btn-eraser" onclick="setMode('eraser')">消しゴム</button>
-      <button class="btn-undo" onclick="undo()">↩️ もどす</button>
-      <button class="btn-clear" onclick="clearCanvas()">ぜんぶ消す</button>
-    </div>
-    <button class="btn-send" onclick="sendDrawing()">🚀 送信！</button>
+  <div class="header">🎨 じゆうにお絵描きしてみよう！</div>
+
+  <div class="canvas-container">
+    <canvas id="drawCanvas"></canvas>
   </div>
 
-  <div class="canvas-wrapper">
-    <canvas id="canvas" width="800" height="600"></canvas>
+  <div class="toolbar">
+    <div class="colors">
+      <div class="color-btn active" style="background:#000000;" onclick="setPenColor('#000000', this)"></div>
+      <div class="color-btn" style="background:#e53935;" onclick="setPenColor('#e53935', this)"></div>
+      <div class="color-btn" style="background:#1e88e5;" onclick="setPenColor('#1e88e5', this)"></div>
+      <div class="color-btn" style="background:#43a047;" onclick="setPenColor('#43a047', this)"></div>
+      <div class="color-btn" style="background:#fdd835;" onclick="setPenColor('#fdd835', this)"></div>
+      <div class="color-btn" style="background:#fb8c00;" onclick="setPenColor('#fb8c00', this)"></div>
+      <div class="color-btn" style="background:#d81b60;" onclick="setPenColor('#d81b60', this)"></div>
+      <div class="color-btn" style="background:#8d6e63;" onclick="setPenColor('#8d6e63', this)"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn-clear" onclick="clearCanvas()">🗑️ けす</button>
+    <button class="btn-send" onclick="openChoiceModal()">🚀 およがせる！</button>
+  </div>
+
+  <!-- ★ 送信前マナー案内 ＆ 生物選択モーダル ★ -->
+  <div class="modal-overlay" id="choiceModal">
+    <div class="modal-card">
+      
+      <!-- 注意書き案内 -->
+      <div class="modal-notice">
+        ⚠️ おねがい<br>
+        みんなが たのしくあそべるように、ひとを きずつける ことばや 絵は かいていないかな？
+      </div>
+
+      <div class="modal-title">どれで およがせる？</div>
+
+      <div class="modal-buttons">
+        <button class="btn-choice choice-fish" onclick="selectAndSend('fish')">🐟 さかな</button>
+        <button class="btn-choice choice-crab" onclick="selectAndSend('crab')">🦀 カニ</button>
+        <button class="btn-choice choice-octopus" onclick="selectAndSend('octopus')">🐙 たこ・くらげ</button>
+        <button class="btn-choice btn-back" onclick="closeChoiceModal()">← かきなおす</button>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="loadingOverlay">
+    <div style="font-size: 3.5rem;">🚀</div>
+    <div style="margin-top: 10px;">すいぞくかんへ おくっているよ...</div>
   </div>
 
   <script type="module">
@@ -145,216 +192,109 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    const colorPicker = document.getElementById('colorPicker');
-    const sizePicker = document.getElementById('sizePicker');
-    
-    let drawing = false;
-    let mode = 'pen';
+    const canvas = document.getElementById('drawCanvas');
+    const ctx = canvas.getContext('2d');
+    const loadingOverlay = document.getElementById('loadingOverlay');
 
-    const bucketCursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="%23ff9800" stroke="%23333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2a2 2 0 0 0 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/></svg>') 2 28, auto`;
+    let isDrawing = false;
+    let currentColor = '#000000';
+    let currentLineWidth = 8;
+    let hasDrawn = false;
 
-    const historyStack = [];
-    const MAX_HISTORY = 15;
-
-    function saveState() {
-      if (historyStack.length >= MAX_HISTORY) {
-        historyStack.shift();
-      }
-      historyStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+    function resizeCanvas() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width * 2;
+      canvas.height = rect.height * 2;
+      ctx.scale(2, 2);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
     }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
 
-    window.undo = function() {
-      if (historyStack.length > 0) {
-        const previousState = historyStack.pop();
-        ctx.putImageData(previousState, 0, 0);
-      }
+    window.setPenColor = function(color, btn) {
+      currentColor = color;
+      document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
     };
 
-    window.setMode = function(newMode) {
-      mode = newMode;
-      document.getElementById('btnPen').classList.remove('active');
-      document.getElementById('btnFill').classList.remove('active');
-      document.getElementById('btnEraser').classList.remove('active');
-
-      if (mode === 'pen') {
-        ctx.globalCompositeOperation = 'source-over';
-        document.getElementById('btnPen').classList.add('active');
-        canvas.style.cursor = 'crosshair';
-      } else if (mode === 'fill') {
-        ctx.globalCompositeOperation = 'source-over';
-        document.getElementById('btnFill').classList.add('active');
-        canvas.style.cursor = bucketCursor;
-      } else if (mode === 'eraser') {
-        ctx.globalCompositeOperation = 'destination-out';
-        document.getElementById('btnEraser').classList.add('active');
-        canvas.style.cursor = 'cell';
-      }
-    };
-
-    const getPos = (e) => {
+    function getPos(e) {
       const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
       return {
-        x: (clientX - rect.left) * scaleX,
-        y: (clientY - rect.top) * scaleY
+        x: clientX - rect.left,
+        y: clientY - rect.top
       };
-    };
-
-    const start = (e) => { 
-      e.preventDefault(); 
-      saveState();
-
-      const pos = getPos(e);
-
-      if (mode === 'fill') {
-        floodFill(pos.x, pos.y, colorPicker.value);
-        setMode('pen');
-      } else {
-        drawing = true; 
-        draw(e); 
-      }
-    };
-    
-    const end = () => { 
-      drawing = false; 
-      ctx.beginPath(); 
-    };
-    
-    const draw = (e) => {
-      if (!drawing || mode === 'fill') return;
-      e.preventDefault();
-      const pos = getPos(e);
-      
-      ctx.lineWidth = sizePicker.value;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = mode === 'pen' ? colorPicker.value : "rgba(0,0,0,1)";
-      
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(pos.x, pos.y);
-    };
-
-    canvas.addEventListener('mousedown', start);
-    canvas.addEventListener('mouseup', end);
-    canvas.addEventListener('mousemove', draw);
-    canvas.addEventListener('touchstart', start, {passive: false});
-    canvas.addEventListener('touchend', end);
-    canvas.addEventListener('touchmove', draw, {passive: false});
-
-    window.clearCanvas = function() {
-      saveState();
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    };
-
-    function floodFill(startX, startY, fillColorHex) {
-      startX = Math.floor(startX);
-      startY = Math.floor(startY);
-
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-      const width = canvas.width;
-      const height = canvas.height;
-
-      const startPos = (startY * width + startX) * 4;
-      const startR = data[startPos];
-      const startG = data[startPos + 1];
-      const startB = data[startPos + 2];
-      const startA = data[startPos + 3];
-
-      const fillR = parseInt(fillColorHex.slice(1, 3), 16);
-      const fillG = parseInt(fillColorHex.slice(3, 5), 16);
-      const fillB = parseInt(fillColorHex.slice(5, 7), 16);
-      const fillA = 255;
-
-      if (Math.abs(startR - fillR) < 10 && 
-          Math.abs(startG - fillG) < 10 && 
-          Math.abs(startB - fillB) < 10 && 
-          Math.abs(startA - fillA) < 10) return;
-
-      const pixelStack = [[startX, startY]];
-      const tolerance = 40;
-
-      function matchStartColor(pos) {
-        const r = data[pos];
-        const g = data[pos + 1];
-        const b = data[pos + 2];
-        const a = data[pos + 3];
-
-        return (
-          Math.abs(r - startR) <= tolerance &&
-          Math.abs(g - startG) <= tolerance &&
-          Math.abs(b - startB) <= tolerance &&
-          Math.abs(a - startA) <= tolerance
-        );
-      }
-
-      function colorPixel(pos) {
-        data[pos] = fillR;
-        data[pos + 1] = fillG;
-        data[pos + 2] = fillB;
-        data[pos + 3] = fillA;
-      }
-
-      while (pixelStack.length) {
-        const newPos = pixelStack.pop();
-        const x = newPos[0];
-        let y = newPos[1];
-
-        let pixelPos = (y * width + x) * 4;
-        while (y-- >= 0 && matchStartColor(pixelPos)) {
-          pixelPos -= width * 4;
-        }
-        pixelPos += width * 4;
-        ++y;
-
-        let reachLeft = false;
-        let reachRight = false;
-
-        while (y++ < height - 1 && matchStartColor(pixelPos)) {
-          colorPixel(pixelPos);
-
-          if (x > 0) {
-            if (matchStartColor(pixelPos - 4)) {
-              if (!reachLeft) {
-                pixelStack.push([x - 1, y]);
-                reachLeft = true;
-              }
-            } else if (reachLeft) {
-              reachLeft = false;
-            }
-          }
-
-          if (x < width - 1) {
-            if (matchStartColor(pixelPos + 4)) {
-              if (!reachRight) {
-                pixelStack.push([x + 1, y]);
-                reachRight = true;
-              }
-            } else if (reachRight) {
-              reachRight = false;
-            }
-          }
-
-          pixelPos += width * 4;
-        }
-      }
-
-      ctx.putImageData(imageData, 0, 0);
     }
 
-    window.sendDrawing = function() {
-      const dataURL = canvas.toDataURL("image/webp", 0.6);
-      push(ref(db, 'art_stream'), { dataURL: dataURL, createdAt: Date.now() });
-      
-      clearCanvas();
-      alert("えを そうしんしたよ！");
+    function startDraw(e) {
+      isDrawing = true;
+      hasDrawn = true;
+      const pos = getPos(e);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+      ctx.strokeStyle = currentColor;
+      ctx.lineWidth = currentLineWidth;
+    }
+
+    function draw(e) {
+      if (!isDrawing) return;
+      e.preventDefault();
+      const pos = getPos(e);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+    }
+
+    function stopDraw() {
+      isDrawing = false;
+    }
+
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDraw);
+    canvas.addEventListener('mouseleave', stopDraw);
+
+    canvas.addEventListener('touchstart', startDraw, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    canvas.addEventListener('touchend', stopDraw);
+
+    window.clearCanvas = function() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      hasDrawn = false;
+    };
+
+    window.openChoiceModal = function() {
+      if (!hasDrawn) {
+        alert("えが かかれていないよ！なにか かいてみてね。");
+        return;
+      }
+      document.getElementById('choiceModal').style.display = 'flex';
+    };
+
+    window.closeChoiceModal = function() {
+      document.getElementById('choiceModal').style.display = 'none';
+    };
+
+    window.selectAndSend = function(type) {
+      document.getElementById('choiceModal').style.display = 'none';
+      loadingOverlay.style.display = 'flex';
+
+      // 水族館背景に馴染ませるため透明背景画像データ（PNG）として取得
+      const dataURL = canvas.toDataURL("image/png");
+
+      push(ref(db, 'art_stream'), { 
+        dataURL: dataURL, 
+        type: type,
+        createdAt: Date.now() 
+      }).then(() => {
+        loadingOverlay.style.display = 'none';
+        alert("すいぞくかんにおくったよ！");
+        clearCanvas();
+      }).catch(() => {
+        loadingOverlay.style.display = 'none';
+        alert("エラーがおきたよ。もういちどためしてね。");
+      });
     };
   </script>
 </body>
