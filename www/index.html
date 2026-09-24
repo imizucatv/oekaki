@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>みんなのわくわく水族館</title>
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#e0f7fa">
+
+  <style>
+    :root {
+      --bg-sky: #e0f7fa;
+      --card-bg: rgba(255, 255, 255, 0.92);
+      --text-color: #004d40;
+      --accent-coral: #ff7043;
+      --accent-blue: #29b6f6;
+      --accent-orange: #ffa726;
+      --accent-purple: #ab47bc;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      background: linear-gradient(180deg, #e0f7fa 0%, #80deea 100%);
+      font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", Quicksand, sans-serif;
+      color: var(--text-color);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+
+    .bg-bubble {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.5);
+      border-radius: 50%;
+      pointer-events: none;
+      animation: floatUp 8s infinite ease-in;
+      z-index: 0;
+    }
+
+    @keyframes floatUp {
+      0% { transform: translateY(105vh) scale(0.8); opacity: 0.2; }
+      50% { opacity: 0.8; }
+      100% { transform: translateY(-10vh) scale(1.2); opacity: 0; }
+    }
+
+    header {
+      position: relative;
+      z-index: 10;
+      padding-top: max(10px, 1.5vh);
+      width: 100%;
+      text-align: center;
+    }
+
+    .title-banner {
+      background: #ffffff;
+      display: inline-block;
+      padding: 6px 20px;
+      border-radius: 40px;
+      box-shadow: 0 6px 16px rgba(0, 77, 64, 0.12);
+      border: 3px solid #80deea;
+    }
+
+    .title-banner h1 {
+      margin: 0;
+      font-size: min(1.5rem, 4.8vw);
+      color: #00695c;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    main {
+      position: relative;
+      z-index: 10;
+      width: 92vw;
+      max-width: 860px;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 0;
+    }
+
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: min(12px, 2vw);
+      width: 100%;
+      height: 100%;
+      max-height: 540px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: min(12px, 1.5vh) 10px;
+      text-decoration: none;
+      color: var(--text-color);
+      box-shadow: 0 6px 16px rgba(0, 105, 92, 0.12);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s;
+      border: 3px solid #ffffff;
+      text-align: center;
+    }
+
+    .card:active {
+      transform: scale(0.96);
+    }
+
+    .card-icon {
+      font-size: min(3.5rem, 8vh);
+      line-height: 1;
+      margin-top: 2px;
+    }
+
+    .card-info {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .card-title {
+      font-size: min(1.15rem, 3.6vw);
+      font-weight: bold;
+      color: #004d40;
+    }
+
+    .card-desc {
+      font-size: min(0.78rem, 2.5vw);
+      color: #00695c;
+      opacity: 0.85;
+      line-height: 1.2;
+    }
+
+    .card-btn {
+      width: 100%;
+      padding: min(8px, 1.2vh) 0;
+      border-radius: 14px;
+      font-size: min(0.9rem, 2.8vw);
+      font-weight: bold;
+      color: #ffffff;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    }
+
+    .card-display .card-btn { background: var(--accent-blue); }
+    .card-draw .card-btn { background: var(--accent-purple); }
+    .card-scan .card-btn { background: var(--accent-orange); }
+    .card-feed .card-btn { background: var(--accent-coral); }
+
+    footer {
+      position: relative;
+      z-index: 10;
+      padding-bottom: max(8px, 1vh);
+      font-size: min(0.75rem, 2.4vw);
+      color: #004d40;
+      opacity: 0.75;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="bg-bubble" style="width: 24px; height: 24px; left: 12%; animation-duration: 7s;"></div>
+  <div class="bg-bubble" style="width: 42px; height: 40px; left: 28%; animation-duration: 9s; animation-delay: 2s;"></div>
+  <div class="bg-bubble" style="width: 18px; height: 18px; left: 68%; animation-duration: 6s; animation-delay: 1s;"></div>
+  <div class="bg-bubble" style="width: 36px; height: 36px; left: 84%; animation-duration: 10s; animation-delay: 3s;"></div>
+
+  <header>
+    <div class="title-banner">
+      <h1><span>🌊</span> わくわく水族館 <span>🐟</span></h1>
+    </div>
+  </header>
+
+  <main>
+    <div class="menu-grid">
+
+      <!-- 1. 水族館モニター -->
+      <a href="display.html" class="card card-display">
+        <div class="card-icon">🖥️</div>
+        <div class="card-info">
+          <div class="card-title">水族館モニター</div>
+          <div class="card-desc">泳ぐ生き物を大画面で見よう</div>
+        </div>
+        <div class="card-btn">ひらく</div>
+      </a>
+
+      <!-- 2. じゆうにお絵描き -->
+      <a href="draw.html" class="card card-draw">
+        <div class="card-icon">🎨</div>
+        <div class="card-info">
+          <div class="card-title">じゆうにお絵描き</div>
+          <div class="card-desc">画面にタッチして自由にお絵描き</div>
+        </div>
+        <div class="card-btn">描いてあそぶ</div>
+      </a>
+
+      <!-- 3. ぬりえスキャナー -->
+      <a href="scan.html" class="card card-scan">
+        <div class="card-icon">📷</div>
+        <div class="card-info">
+          <div class="card-title">ぬりえスキャナー</div>
+          <div class="card-desc">紙のぬりえをカメラでパシャ</div>
+        </div>
+        <div class="card-btn">スキャン</div>
+      </a>
+
+      <!-- 4. エサやり -->
+      <a href="feed.html" class="card card-feed">
+        <div class="card-icon">🧆</div>
+        <div class="card-info">
+          <div class="card-title">エサやり</div>
+          <div class="card-desc">お魚たちにエサをあげよう</div>
+        </div>
+        <div class="card-btn">あげる</div>
+      </a>
+
+    </div>
+  </main>
+
+  <footer>
+    ※画面の役割に合わせて選択してください
+  </footer>
+
+</body>
+</html>

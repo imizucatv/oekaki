@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>エサやりターミナル</title>
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      width: 100vw; height: 100dvh;
+      overflow: hidden;
+      background: linear-gradient(135deg, #ffe0b2 0%, #ffcc80 100%);
+      font-family: sans-serif;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      user-select: none;
+    }
+
+    .container {
+      text-align: center;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 20px;
+    }
+
+    .title {
+      font-size: 2rem; font-weight: bold;
+      color: #5d4037; text-shadow: 1px 1px 0 #fff;
+    }
+
+    .feed-button {
+      width: 240px; height: 240px;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #8d6e63, #5d4037);
+      border: 8px solid #fff;
+      box-shadow: 0 12px 25px rgba(0,0,0,0.3), inset 0 4px 8px rgba(255,255,255,0.3);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      cursor: pointer; transition: transform 0.08s;
+      outline: none;
+    }
+
+    .feed-button:active {
+      transform: scale(0.90);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    .feed-icon { font-size: 5rem; line-height: 1; }
+    .feed-label { color: #fff; font-size: 1.5rem; font-weight: bold; margin-top: 6px; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="title">🐟 えさを れんだ してみよう！ 🦀</div>
+
+    <button class="feed-button" id="feedBtn" onclick="giveFood()">
+      <span class="feed-icon">🧆</span>
+      <span class="feed-label">えさをあげる！</span>
+    </button>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
+      authDomain: "espu9owen.firebaseapp.com",
+      databaseURL: "https://espu9owen-default-rtdb.firebaseio.com",
+      projectId: "espu9owen",
+      storageBucket: "espu9owen.firebasestorage.app",
+      messagingSenderId: "1003969526788",
+      appId: "1:1003969526788:web:00a61b5a0cc2281de54951",
+      measurementId: "G-GLW0L4Y53H"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    let lastFeedTime = 0;
+
+    window.giveFood = function() {
+      const now = Date.now();
+      if (now - lastFeedTime < 300) return; // 0.3秒の高速連打許可
+      lastFeedTime = now;
+
+      // 1タップで 2〜3 個のエサをバラバラに投下！
+      const foodCount = Math.floor(Math.random() * 2) + 2; 
+      for (let i = 0; i < foodCount; i++) {
+        setTimeout(() => {
+          push(ref(db, 'feed_stream'), { createdAt: Date.now() });
+        }, i * 120);
+      }
+    };
+  </script>
+</body>
+</html>
