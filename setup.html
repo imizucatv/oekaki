@@ -58,8 +58,7 @@
     <div class="dl-item">
       <div class="dl-title">📱 Android用アプリ (APK)</div>
       <p>受付用タブレット・エサやり端末用</p>
-      <!-- GitHub Release経由に変更する場合の例（ローカル配置の場合は downloads/aquarium-app.apk のままでOK） -->
-      <a href="https://github.com/imizucatv/oekaki/releases/download/v1.0.0/aquarium-app.apk" class="btn" download>APKファイルをダウンロード</a>
+      <a href="downloads/aquarium-app.apk" class="btn" download>APKファイルをダウンロード</a>
     </div>
 
     <div class="dl-item">
@@ -71,28 +70,20 @@
     <div class="dl-item">
       <div class="dl-title">🍏 Mac用アプリ (.dmg)</div>
       <p>大画面ディスプレイ出力用Mac</p>
-      <!-- ボタンテキストを (.dmg) に修正 -->
-      <a href="https://github.com/imizucatv/oekaki/releases/download/v1.0.0/aquarium-mac.dmg" class="btn" style="background:#5e35b1;" download>Mac用アプリ(.dmg)をダウンロード</a>
-      <div style="font-size: 0.85em; color: #666; margin-top: 8px;">
-        ※ Mac版をダウンロード後、起動できない場合の対処法：<br>
-        1. ダウンロードした `.dmg` を開いてアプリ（.app）を「アプリケーション」フォルダへ移動。<br>
-        2. アプリを <b>`Control` キーを押しながらクリック ➔「開く」</b> を選択。<br>
-        3. 警告が出たらそのまま「開く」をクリックしてください。<br>
-        （※それでも開かない場合は、ターミナルで <code>xattr -cr /Applications/aquarium-app.app</code> を実行してください）
-      </div>
+      <a href="https://github.com/imizucatv/oekaki/releases/download/v1.0.0/aquarium-mac.zip" class="btn" style="background:#5e35b1;" download>Mac用アプリ(zip)をダウンロード</a>
     </div>
 
     <div class="dl-item">
       <div class="dl-title">🍎 iPad / iPhone (Safari)</div>
       <p>Safariでこのページを開き、共有メニューから「ホーム画面に追加」をタップしてください。</p>
-      <!-- パスを www/index.html に修正 -->
-      <a href="www/index.html" class="btn" style="background:#ff9800;">Webポータルを開く</a>
+      <a href="index.html" class="btn" style="background:#ff9800;">Webポータルを開く</a>
     </div>
   </div>
 
   <script>
     function checkPassword() {
       const pass = document.getElementById('passInput').value;
+      // 管理用暗証番号（必要に応じて変更してください）
       if (pass === "aqua2026") {
         document.getElementById('authCard').style.display = 'none';
         document.getElementById('adminContent').style.display = 'block';
