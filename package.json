@@ -2,10 +2,10 @@
   "name": "aquarium-app",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build:mac": "electron-builder --mac dmg",
+    "build:mac": "electron-builder --mac",
     "build:win": "electron-builder --win nsis"
   },
   "keywords": [],
@@ -20,5 +20,19 @@
     "@capacitor/android": "^8.5.2",
     "@capacitor/cli": "^8.5.2",
     "@capacitor/core": "^8.5.2"
+  },
+  "build": {
+    "appId": "com.aquarium.app",
+    "productName": "aquarium-app",
+    "files": [
+      "main.js",
+      "www/**/*"
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    }
   }
 }
