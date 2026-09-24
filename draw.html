@@ -11,10 +11,10 @@
   <style>
     html, body {
       margin: 0; padding: 0;
-      width: 100%; /* 100vw から 100% に変更（はみ出し防止） */
+      width: 100%;
       height: 100dvh;
       overflow: hidden;
-      touch-action: none; /* ★お絵描き中の画面全体スクロールを防止 */
+      touch-action: none; /* お絵描き中の画面全体スクロール防止 */
       background-color: #e0f7fa;
       font-family: sans-serif;
       display: flex; flex-direction: column;
@@ -28,7 +28,6 @@
       color: #004d40;
     }
 
-    /* キャンバスの高さを 54dvh ➔ 42dvh に小さくして下のボタン収まりを改善 */
     .canvas-container {
       position: relative; width: 92vw; height: 42dvh; max-width: 800px;
       display: flex; justify-content: center; align-items: center;
@@ -42,14 +41,12 @@
       cursor: crosshair;
     }
 
-    /* ツール＆カラーパレット */
     .toolbar {
       width: 92vw; max-width: 800px;
       display: flex; flex-direction: column; gap: 6px;
       align-items: center; padding: 2px;
     }
 
-    /* ツール切り替え（ペン／ぬりつぶし） */
     .tool-selector {
       display: flex; gap: 8px; margin-bottom: 2px;
     }
@@ -90,7 +87,6 @@
     .btn-clear { background: #757575; color: #fff; }
     .btn-send { background: #ab47bc; color: #fff; font-size: 1.1rem; padding: 10px 24px; box-shadow: 0 4px 10px rgba(171,71,188,0.3); }
 
-    /* モーダル */
     .modal-overlay {
       display: none;
       position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
@@ -148,13 +144,11 @@
   </div>
 
   <div class="toolbar">
-    <!-- ツール切り替え -->
     <div class="tool-selector">
       <button class="btn-tool active" id="btnPen" onclick="setTool('pen')">✏️ ペン</button>
       <button class="btn-tool" id="btnFill" onclick="setTool('fill')">🪣 ぬりつぶし</button>
     </div>
 
-    <!-- カラーパレット -->
     <div class="colors">
       <div class="color-btn active" style="background:#000000;" onclick="setPenColor('#000000', this)"></div>
       <div class="color-btn" style="background:#e53935;" onclick="setPenColor('#e53935', this)"></div>
@@ -172,7 +166,6 @@
     <button class="btn-send" onclick="openChoiceModal()">🚀 およがせる！</button>
   </div>
 
-  <!-- マナー案内 ＆ 生物選択モーダル -->
   <div class="modal-overlay" id="choiceModal">
     <div class="modal-card">
       <div class="modal-notice">
@@ -221,7 +214,7 @@
     let isDrawing = false;
     let currentColor = '#000000';
     let currentLineWidth = 8;
-    let currentTool = 'pen'; // 'pen' | 'fill'
+    let currentTool = 'pen';
     let hasDrawn = false;
 
     function resizeCanvas() {
@@ -411,8 +404,20 @@
       document.getElementById('choiceModal').style.display = 'none';
       loadingOverlay.style.display = 'flex';
 
-      // ★重要：PNGからJPEG(画質0.6)に変更して送信データ容量を1/10以下に圧縮（送信エラー対策）
-      const dataURL = canvas.toDataURL("image/jpeg", 0.6);
+      // ★送信用に背景透明（PNG）のままサイズを最適化（幅600pxへ圧縮）
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      const maxW = 600;
+      const scale = maxW / canvas.width;
+      
+      tempCanvas.width = maxW;
+      tempCanvas.height = canvas.height * scale;
+
+      // 縮小描画
+      tempCtx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+
+      // 背景透明のPNGデータ取得（データ量は1/5以下に軽量化）
+      const dataURL = tempCanvas.toDataURL("image/png");
 
       push(ref(db, 'art_stream'), { 
         dataURL: dataURL, 
