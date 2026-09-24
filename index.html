@@ -8,6 +8,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#e0f7fa">
+  <!-- スマホでホーム画面追加時にアプリ化（全画面表示）する設定 -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
   <style>
     :root {
@@ -28,10 +32,11 @@
     html, body {
       margin: 0;
       padding: 0;
-      width: 100vw;
+      width: 100%; /* 100vw から 100% に変更（はみ出し防止） */
       height: 100vh;
       height: 100dvh;
       overflow: hidden;
+      touch-action: none; /* ★これを追加（指でお絵描きの最中に画面全体がスクロールするのを防止） */
       background: linear-gradient(180deg, #e0f7fa 0%, #80deea 100%);
       font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", Quicksand, sans-serif;
       color: var(--text-color);
