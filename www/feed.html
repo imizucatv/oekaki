@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>エサやりターミナル</title>
+  <title>スリングショット・エサやりターミナル</title>
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -13,99 +13,235 @@
       margin: 0; padding: 0;
       width: 100%; height: 100dvh;
       overflow: hidden;
-      touch-action: none; /* スマホの連打による画面ズレ・拡大を防止 */
-      background: linear-gradient(135deg, #ffe0b2 0%, #ffcc80 100%);
-      font-family: sans-serif;
+      touch-action: none;
+      background: radial-gradient(circle at center, #fff3e0 0%, #ffe0b2 100%);
+      font-family: "M PLUS Rounded 1c", sans-serif;
       display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
+      align-items: center; justify-content: space-between;
       user-select: none;
     }
 
-    .container {
+    .header {
+      margin-top: min(40px, 6vh);
       text-align: center;
-      display: flex; flex-direction: column;
-      align-items: center; gap: 20px;
+      pointer-events: none;
     }
 
     .title {
-      font-size: 1.8rem; font-weight: bold;
-      color: #5d4037; text-shadow: 1px 1px 0 #fff;
+      font-size: min(1.6rem, 5vw);
+      font-weight: bold;
+      color: #5d4037;
+      text-shadow: 0 2px 4px rgba(255,255,255,0.8);
     }
 
-    .feed-button {
-      width: 240px; height: 240px;
+    .subtitle {
+      font-size: min(1rem, 3.5vw);
+      color: #8d6e63;
+      margin-top: 6px;
+    }
+
+    /* エサ投げステージ */
+    .slingshot-stage {
+      position: relative;
+      width: 280px; height: 320px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ターゲットリング */
+    .target-ring {
+      position: absolute;
+      top: 20px; width: 120px; height: 120px;
+      border: 4px dashed #bcaaa4;
       border-radius: 50%;
-      background: linear-gradient(145deg, #8d6e63, #5d4037);
-      border: 8px solid #fff;
-      box-shadow: 0 12px 25px rgba(0,0,0,0.3), inset 0 4px 8px rgba(255,255,255,0.3);
+      opacity: 0.5;
+      display: flex; align-items: center; justify-content: center;
+      color: #8d6e63; font-size: 0.9rem; font-weight: bold;
+      pointer-events: none;
+    }
+
+    /* 引っ張りゴム紐 */
+    .rubber-band {
+      position: absolute;
+      top: 180px; left: 50%;
+      width: 4px; height: 0px;
+      background: #8d6e63;
+      transform-origin: top center;
+      pointer-events: none;
+      z-index: 1;
+      display: none;
+    }
+
+    /* エサ本体 */
+    .food-ball {
+      position: absolute;
+      top: 140px;
+      width: 90px; height: 90px;
+      background: radial-gradient(circle at 30% 30%, #a1887f, #4e342e);
+      border: 4px solid #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.25);
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      cursor: pointer; transition: transform 0.05s;
-      outline: none;
+      cursor: grab;
+      z-index: 10;
+      touch-action: none;
+      will-change: transform;
     }
 
-    .feed-button:active, .feed-button.active {
-      transform: scale(0.88);
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    .food-ball:active { cursor: grabbing; }
+
+    .food-icon { font-size: 2.2rem; line-height: 1; pointer-events: none; }
+    .food-label { color: #fff; font-size: 0.75rem; font-weight: bold; margin-top: 2px; pointer-events: none; }
+
+    /* アニメーション用クラス */
+    .food-ball.snap-back {
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
 
-    .feed-icon { font-size: 5rem; line-height: 1; }
-    .feed-label { color: #fff; font-size: 1.5rem; font-weight: bold; margin-top: 6px; }
+    .food-ball.shoot-out {
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s;
+      transform: translate(0px, -450px) scale(0.2) !important;
+      opacity: 0;
+    }
+
+    .food-ball.reloading {
+      transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+      transform: translate(0px, 0px) scale(1);
+      opacity: 1;
+    }
+
+    .footer-hint {
+      margin-bottom: min(30px, 4vh);
+      font-size: 0.85rem; color: #8d6e63;
+      font-weight: bold; text-align: center;
+    }
   </style>
 </head>
 <body>
 
-  <div class="container">
-    <div class="title">🐟 えさを れんだ してみよう！ 🦀</div>
-
-    <button class="feed-button" id="feedBtn" onclick="giveFood()">
-      <span class="feed-icon">🧆</span>
-      <span class="feed-label">えさをあげる！</span>
-    </button>
+  <div class="header">
+    <div class="title">🐟 えさやり スリング 🦀</div>
+    <div class="subtitle">ひっぱって・はなそう！</div>
   </div>
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+  <div class="slingshot-stage">
+    <div class="target-ring">ねらう</div>
+    <div class="rubber-band" id="rubberBand"></div>
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
-    authDomain: "espu9owen.firebaseapp.com",
-    databaseURL: "https://espu9owen-default-rtdb.firebaseio.com",
-    projectId: "espu9owen",
-    storageBucket: "espu9owen.firebasestorage.app",
-    messagingSenderId: "1003969526788",
-    appId: "1:1003969526788:web:00a61b5a0cc2281de54951",
-    measurementId: "G-GLW0L4Y53H"
-  };
+    <div class="food-ball" id="foodBall">
+      <span class="food-icon">🧆</span>
+      <span class="food-label">ひっぱる</span>
+    </div>
+  </div>
 
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
+  <div class="footer-hint" id="statusText">👇 エサを下にひっぱってね</div>
 
-  let isSending = false;
-  const feedBtn = document.getElementById('feedBtn');
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-  window.giveFood = function() {
-    // すでに送信中、または連打時は無視する（0.5秒ガード）
-    if (isSending) return;
-    isSending = true;
+    const firebaseConfig = {
+      apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
+      authDomain: "espu9owen.firebaseapp.com",
+      databaseURL: "https://espu9owen-default-rtdb.firebaseio.com",
+      projectId: "espu9owen",
+      storageBucket: "espu9owen.firebasestorage.app",
+      messagingSenderId: "1003969526788",
+      appId: "1:1003969526788:web:00a61b5a0cc2281de54951",
+      measurementId: "G-GLW0L4Y53H"
+    };
 
-    // タップの見た目の演出
-    feedBtn.classList.add('active');
-    setTimeout(() => feedBtn.classList.remove('active'), 100);
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-    // ★ ループを削除し、1回のタップで「1個」だけ push します
-    push(ref(db, 'feed_stream'), { createdAt: Date.now() })
-      .then(() => {
-        // 0.5秒後に次のタップを許可（連打防止）
-        setTimeout(() => { isSending = false; }, 500);
-      })
-      .catch(err => {
-        console.error("エサ送信エラー:", err);
-        alert("送信エラーが発生しました。");
-        isSending = false;
-      });
-  };
-</script>
+    const foodBall = document.getElementById('foodBall');
+    const statusText = document.getElementById('statusText');
+
+    let isDragging = false;
+    let isLoaded = true; // 装填状態フラグ
+    let startY = 0;
+    let currentDY = 0;
+
+    const PULL_THRESHOLD = 80; // 発射に必要な引っ張り距離(px)
+
+    // ドラッグ開始
+    foodBall.addEventListener('pointerdown', (e) => {
+      if (!isLoaded) return; // 再装填中なら無視
+      isDragging = true;
+      startY = e.clientY;
+      currentDY = 0;
+
+      foodBall.classList.remove('snap-back', 'reloading');
+      foodBall.setPointerCapture(e.pointerId);
+    });
+
+    // ドラッグ中
+    foodBall.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+
+      const dy = e.clientY - startY;
+      // 下方向にのみ引ける（上方向や引きすぎを制限）
+      currentDY = Math.min(Math.max(0, dy), 150);
+
+      foodBall.style.transform = `translate(0px, ${currentDY}px) scale(${1 + currentDY * 0.001})`;
+
+      if (currentDY >= PULL_THRESHOLD) {
+        statusText.innerText = "✨ てを はなして はっしゃ！";
+        statusText.style.color = "#e65100";
+      } else {
+        statusText.innerText = "👇 もっと ひっぱって！";
+        statusText.style.color = "#8d6e63";
+      }
+    });
+
+    // ドラッグ終了（放した瞬間）
+    const handleRelease = (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+
+      if (currentDY >= PULL_THRESHOLD && isLoaded) {
+        // ★ 判定成功：即座にロックをかけて1回だけ発射
+        isLoaded = false; 
+        shootFood();
+      } else {
+        // 距離不足：元の位置へ弾んで戻る
+        foodBall.classList.add('snap-back');
+        foodBall.style.transform = `translate(0px, 0px) scale(1)`;
+        statusText.innerText = "👇 エサを下にひっぱってね";
+        statusText.style.color = "#8d6e63";
+      }
+    };
+
+    foodBall.addEventListener('pointerup', handleRelease);
+    foodBall.addEventListener('pointercancel', handleRelease);
+
+    // 発射＆Firebase送信処理（絶対に1回のみ実行）
+    function shootFood() {
+      statusText.innerText = "🚀 ポーン！";
+      
+      // 1. 上へ飛んでいくCSSアニメーション
+      foodBall.classList.add('shoot-out');
+
+      // 2. Firebaseへ「確実に1個だけ」送信
+      push(ref(db, 'feed_stream'), { createdAt: Date.now() })
+        .catch(err => {
+          console.error("送信エラー:", err);
+        });
+
+      // 3. 1秒後に新しいエサを「再装填（リロード）」
+      setTimeout(() => {
+        foodBall.classList.remove('shoot-out');
+        foodBall.style.transform = `translate(0px, 0px) scale(0)`;
+        
+        setTimeout(() => {
+          foodBall.classList.add('reloading');
+          foodBall.style.transform = `translate(0px, 0px) scale(1)`;
+          statusText.innerText = "👇 エサを下にひっぱってね";
+          statusText.style.color = "#8d6e63";
+          isLoaded = true; // 解放！次の発射が可能に
+        }, 50);
+      }, 700);
+    }
+  </script>
 </body>
 </html>
