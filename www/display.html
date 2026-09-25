@@ -210,18 +210,29 @@
       }
     });
 
-    // ★ エサ受信処理（選択画面にいた間の古いエサは破棄するガードを追加）
+    // 画面ロード時刻の記録
+    const pageStartTime = Date.now();
+
+    // ★ エサ受信処理（厳密なガード処理に修正）
     onChildAdded(ref(db, 'feed_stream'), (snapshot) => {
       const data = snapshot.val();
-      const now = Date.now();
-      const createdAt = (data && data.createdAt) ? data.createdAt : now;
 
-      // 15秒以上前（選択画面にいた間など）に送信された古いエサは落とさずに消去
-      if (now - createdAt > 15000) {
+      // 1. createdAt が未定義、または数値でないデータは過去の破損ログとして削除
+      if (!data || typeof data.createdAt !== 'number') {
         remove(snapshot.ref);
         return;
       }
 
+      const now = Date.now();
+      const createdAt = data.createdAt;
+
+      // 2. 画面起動前に読み込まれた過去ログ、または10秒以上古いエサは即座に削除
+      if (createdAt < pageStartTime - 1000 || (now - createdAt) > 10000) {
+        remove(snapshot.ref);
+        return;
+      }
+
+      // 3. 正常なエサのみ落下を実行
       dropFood();
       remove(snapshot.ref);
     });
@@ -520,7 +531,6 @@
 
               moveTimer = setTimeout(swim, 600);
             } else {
-              // アニメーションリセット（金縛り）を防ぐ動的追尾制御
               const targetX = currentTargetFood.x - (baseW * currentScale) / 2;
               const targetY = currentTargetFood.y - (baseH * currentScale) / 2;
               
