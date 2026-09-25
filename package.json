@@ -1,7 +1,7 @@
 {
   "name": "aquarium-app",
   "version": "1.0.1",
-  "description": "‚İ‚ñ‚È‚Ì‚í‚­‚í‚­…‘°ŠÙ",
+  "description": "ã¿ã‚“ãªã®ã‚ãã‚ãæ°´æ—é¤¨",
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -13,7 +13,7 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "electron": "^44.4.5",
+    "electron": "^29.0.0",
     "electron-builder": "^26.15.3"
   },
   "dependencies": {
