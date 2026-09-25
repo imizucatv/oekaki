@@ -210,7 +210,18 @@
       }
     });
 
+    // ★ エサ受信処理（選択画面にいた間の古いエサは破棄するガードを追加）
     onChildAdded(ref(db, 'feed_stream'), (snapshot) => {
+      const data = snapshot.val();
+      const now = Date.now();
+      const createdAt = (data && data.createdAt) ? data.createdAt : now;
+
+      // 15秒以上前（選択画面にいた間など）に送信された古いエサは落とさずに消去
+      if (now - createdAt > 15000) {
+        remove(snapshot.ref);
+        return;
+      }
+
       dropFood();
       remove(snapshot.ref);
     });
@@ -237,7 +248,7 @@
         x: startX + 13,
         y: startY + 13,
         isEaten: false,
-        targetedBy: null, // ★ 1対1排他ロック用プロパティ（誰が狙っているか）
+        targetedBy: null,
         id: Date.now() + Math.random()
       };
       activeFoods.push(foodObj);
@@ -384,18 +395,16 @@
           return duration * 1000;
         };
 
-        // ★ エサの排他ターゲット関数（他の生物と重複しないように予約）
         const targetFood = (foodObj) => {
           if (isLeaving || isFull || foodObj.isEaten) return;
 
-          // 古い予約があれば解除
           if (currentTargetFood && currentTargetFood.targetedBy === creatureObj) {
             currentTargetFood.targetedBy = null;
           }
 
           isTargetingFood = true;
           currentTargetFood = foodObj;
-          foodObj.targetedBy = creatureObj; // ★ ロック獲得！
+          foodObj.targetedBy = creatureObj;
           clearTimeout(moveTimer);
 
           moveTo(foodObj.x - (baseW * currentScale) / 2, foodObj.y - (baseH * currentScale) / 2, true);
@@ -403,10 +412,12 @@
 
         const releaseFoodTarget = () => {
           if (currentTargetFood && currentTargetFood.targetedBy === creatureObj) {
-            currentTargetFood.targetedBy = null; // ★ ロック解除
+            currentTargetFood.targetedBy = null;
           }
           isTargetingFood = false;
           currentTargetFood = null;
+          delete container.dataset.lastTx;
+          delete container.dataset.lastTy;
         };
 
         const swim = () => {
@@ -433,7 +444,7 @@
           moveTimer = setTimeout(swim, durationMs + restTime);
         };
 
-        // 🧠 1対1排他ロック対応AI（100ms周期）
+        // 🧠 AI処理
         aiInterval = setInterval(() => {
           if (isLeaving) {
             clearInterval(aiInterval);
@@ -442,14 +453,13 @@
 
           const realPos = getRealPos();
 
-          // 1. まだ誰も狙っていない（未予約の）エサの中で、一番近いものを検索
+          // 1. 未予約のエサを検索
           if (!isTargetingFood && !isFull && activeFoods.length > 0) {
             let closestFood = null;
             let minDistance = Infinity;
 
             activeFoods.forEach(food => {
               if (food.isEaten) return;
-              // ★ 他の生物が狙っているエサ（targetedByが自分以外）はスキップ！
               if (food.targetedBy && food.targetedBy !== creatureObj) return;
 
               const dist = Math.hypot(food.x - realPos.x, food.y - realPos.y);
@@ -464,7 +474,7 @@
             }
           }
 
-          // 2. 追尾中＆食いつき判定
+          // 2. 追尾＆パクッと食いつき
           if (isTargetingFood && currentTargetFood) {
             if (currentTargetFood.isEaten) {
               releaseFoodTarget();
@@ -475,12 +485,12 @@
             let isHit = false;
             if (type === 'crab') {
               const dx = Math.abs(currentTargetFood.x - realPos.x);
-              if (dx < 45 && currentTargetFood.y >= window.innerHeight - 180) {
+              if (dx < 60 && currentTargetFood.y >= window.innerHeight - 200) {
                 isHit = true;
               }
             } else {
               const dist = Math.hypot(currentTargetFood.x - realPos.x, currentTargetFood.y - realPos.y);
-              if (dist < 45) {
+              if (dist < 60) {
                 isHit = true;
               }
             }
@@ -510,8 +520,18 @@
 
               moveTimer = setTimeout(swim, 600);
             } else {
-              // 落下中のエサの位置へ動的追尾
-              moveTo(currentTargetFood.x - (baseW * currentScale) / 2, currentTargetFood.y - (baseH * currentScale) / 2, true);
+              // アニメーションリセット（金縛り）を防ぐ動的追尾制御
+              const targetX = currentTargetFood.x - (baseW * currentScale) / 2;
+              const targetY = currentTargetFood.y - (baseH * currentScale) / 2;
+              
+              const lastX = parseFloat(container.dataset.lastTx || 0);
+              const lastY = parseFloat(container.dataset.lastTy || 0);
+              
+              if (Math.hypot(targetX - lastX, targetY - lastY) > 40) {
+                container.dataset.lastTx = targetX;
+                container.dataset.lastTy = targetY;
+                moveTo(targetX, targetY, true);
+              }
             }
           }
         }, 100);
