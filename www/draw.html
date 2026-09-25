@@ -3,194 +3,173 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>じゆうにお絵描きキャンバス</title>
+  <title>じゆうにお絵描きターミナル</title>
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
 
   <style>
+    :root {
+      --primary-color: #00bcd4;
+      --bg-color: #e0f7fa;
+    }
+
     html, body {
       margin: 0; padding: 0;
-      width: 100vw; height: 100dvh;
+      width: 100%; height: 100dvh;
       overflow: hidden;
-      background-color: #e0f7fa;
-      font-family: sans-serif;
+      touch-action: none;
+      background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
+      font-family: "M PLUS Rounded 1c", sans-serif;
       display: flex; flex-direction: column;
       align-items: center; justify-content: space-between;
       user-select: none;
     }
 
-    .header {
-      padding: max(8px, 1vh); font-size: 1.1rem; font-weight: bold;
-      text-align: center; background: rgba(255,255,255,0.8); width: 100%; box-sizing: border-box;
-      color: #004d40;
+    /* ヘッダーエリア */
+    .header-bar {
+      width: 100%; padding: 8px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      box-sizing: border-box;
     }
 
+    .title {
+      font-size: min(1.2rem, 4vw); font-weight: bold; color: #006064;
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    .type-selector {
+      display: flex; gap: 6px; background: rgba(255,255,255,0.8);
+      padding: 4px; border-radius: 20px; border: 2px solid #80deea;
+    }
+
+    .type-btn {
+      border: none; background: transparent; padding: 4px 10px;
+      border-radius: 16px; font-size: 0.85rem; font-weight: bold;
+      color: #00838f; cursor: pointer; transition: all 0.2s;
+    }
+
+    .type-btn.active { background: #00acc1; color: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+
+    /* メインキャンバスエリア */
     .canvas-container {
-      position: relative; width: 92vw; height: 54dvh; max-width: 800px;
-      display: flex; justify-content: center; align-items: center;
-      background: #ffffff; border-radius: 20px;
-      box-shadow: 0 6px 20px rgba(0, 105, 92, 0.15);
-      border: 4px solid #80deea; touch-action: none;
+      position: relative; flex: 1; width: 94vw; max-width: 800px;
+      margin: 4px 0; display: flex; align-items: center; justify-content: center;
     }
 
     canvas {
-      width: 100%; height: 100%; border-radius: 16px;
-      cursor: crosshair;
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 8px 24px rgba(0, 96, 100, 0.15);
+      border: 4px solid #ffffff;
+      touch-action: none;
     }
 
-    /* ツール＆カラーパレット */
+    /* カーソル指定 */
+    canvas.cursor-pen { cursor: crosshair; }
+    canvas.cursor-eraser { cursor: cell; }
+    /* ★ 1. 塗りつぶし時のペイントバケツカーソル */
+    canvas.cursor-bucket {
+      cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="%2300acc1" stroke="%23ffffff" stroke-width="2"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><circle cx="20" cy="18" r="3" fill="%23ff4081"/></svg>') 4 28, pointer;
+    }
+
+    /* ツールバーエリア */
     .toolbar {
-      width: 92vw; max-width: 800px;
-      display: flex; flex-direction: column; gap: 8px;
-      align-items: center; padding: 4px;
+      width: 96vw; max-width: 820px; background: rgba(255,255,255,0.92);
+      border-radius: 24px 24px 0 0; padding: 10px 12px min(20px, 3vh);
+      box-shadow: 0 -4px 20px rgba(0,60,64,0.1);
+      display: flex; flex-direction: column; gap: 10px;
+      box-sizing: border-box;
     }
 
-    /* ツール切り替え（ペン／ぬりつぶし） */
-    .tool-selector {
-      display: flex; gap: 10px; margin-bottom: 2px;
+    .tool-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
     }
 
-    .btn-tool {
-      padding: 6px 16px; border-radius: 20px; border: 2px solid #80deea;
-      background: #fff; color: #004d40; font-weight: bold; cursor: pointer;
-      font-size: 0.95rem; transition: 0.1s;
-    }
-    .btn-tool.active {
-      background: #00897b; color: #fff; border-color: #00897b;
-      box-shadow: 0 2px 8px rgba(0,137,123,0.3);
+    /* ツールボタン群 */
+    .btn-group { display: flex; gap: 6px; }
+
+    .tool-btn {
+      padding: 8px 12px; border-radius: 16px; border: 2px solid #b2ebf2;
+      background: #fff; font-size: min(0.9rem, 3.2vw); font-weight: bold; color: #00838f;
+      display: flex; align-items: center; gap: 4px; cursor: pointer; transition: all 0.15s;
     }
 
-    .colors {
-      display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
-    }
+    .tool-btn:active { transform: scale(0.92); }
+    .tool-btn.active { background: #00acc1; color: #fff; border-color: #00acc1; }
+    .tool-btn:disabled { opacity: 0.35; pointer-events: none; }
 
-    .color-btn {
-      width: 34px; height: 34px; border-radius: 50%; border: 3px solid #fff;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2); cursor: pointer; transition: transform 0.1s;
+    /* カラーパレット */
+    .color-palette { display: flex; gap: 6px; overflow-x: auto; padding: 2px; }
+    .color-dot {
+      width: 32px; height: 32px; border-radius: 50%; border: 3px solid #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2); cursor: pointer; flex-shrink: 0;
+      transition: transform 0.15s;
     }
-    .color-btn.active {
-      transform: scale(1.25); border-color: #004d40;
-    }
+    .color-dot.active { transform: scale(1.25); border-color: #00838f; }
 
-    .controls {
-      padding: 10px; display: flex; gap: 12px; justify-content: center;
-      width: 100%; box-sizing: border-box;
+    /* 送信ボタン */
+    .send-btn {
+      background: linear-gradient(135deg, #ff7043, #f4511e); color: #fff;
+      border: none; padding: 10px 20px; border-radius: 20px;
+      font-size: 1rem; font-weight: bold; cursor: pointer;
+      box-shadow: 0 4px 12px rgba(244, 81, 30, 0.3);
+      display: flex; align-items: center; gap: 6px;
     }
+    .send-btn:active { transform: scale(0.95); }
 
-    button {
-      font-size: 1.1rem; padding: 10px 20px; border-radius: 30px; border: none;
-      cursor: pointer; font-weight: bold; transition: 0.1s; outline: none;
+    /* お知らせトースト */
+    .toast {
+      position: absolute; top: 60px; left: 50%; transform: translateX(-50%) translateY(-20px);
+      background: rgba(0, 96, 100, 0.9); color: #fff; padding: 8px 18px;
+      border-radius: 20px; font-size: 0.85rem; font-weight: bold;
+      pointer-events: none; opacity: 0; transition: all 0.3s; z-index: 100;
     }
-    button:active { transform: scale(0.95); }
-
-    .btn-clear { background: #757575; color: #fff; }
-    .btn-send { background: #ab47bc; color: #fff; font-size: 1.2rem; padding: 12px 28px; box-shadow: 0 4px 10px rgba(171,71,188,0.3); }
-
-    /* モーダル */
-    .modal-overlay {
-      display: none;
-      position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
-      background: rgba(0,0,0,0.85); z-index: 100;
-      flex-direction: column; align-items: center; justify-content: center;
-      gap: 16px; padding: 20px; box-sizing: border-box;
-    }
-
-    .modal-card {
-      background: #ffffff; border-radius: 24px; padding: 20px;
-      max-width: 400px; width: 90%; text-align: center; color: #333;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-    }
-
-    .modal-notice {
-      background: #fff3e0; border: 2px dashed #ff9800; border-radius: 16px;
-      padding: 12px; font-size: 0.95rem; color: #e65100; font-weight: bold;
-      line-height: 1.4; margin-bottom: 16px;
-    }
-
-    .modal-title {
-      font-size: 1.3rem; font-weight: bold; color: #004d40; margin-bottom: 12px;
-    }
-
-    .modal-buttons {
-      display: flex; flex-direction: column; gap: 10px; width: 100%;
-    }
-
-    .btn-choice {
-      font-size: 1.2rem; padding: 14px; border-radius: 30px; border: none;
-      color: #fff; font-weight: bold; cursor: pointer;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: transform 0.1s;
-    }
-    .btn-choice:active { transform: scale(0.95); }
-    .choice-fish { background: #2196f3; }
-    .choice-crab { background: #ff9800; }
-    .choice-octopus { background: #e91e63; }
-    .btn-back { background: #b0bec5; color: #37474f; margin-top: 6px; font-size: 0.95rem; padding: 8px; }
-
-    #loadingOverlay {
-      display: none;
-      position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
-      background: rgba(0,0,0,0.6); z-index: 200;
-      flex-direction: column; align-items: center; justify-content: center;
-      color: #fff; font-size: 1.4rem; font-weight: bold;
-    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   </style>
 </head>
 <body>
 
-  <div class="header">🎨 じゆうにお絵描きしてみよう！</div>
+  <div class="toast" id="toast">✏️ 自動でペンに戻ったよ！</div>
+
+  <div class="header-bar">
+    <div class="title">🎨 おえかきターミナル</div>
+    <div class="type-selector">
+      <button class="type-btn active" data-type="fish">🐟 さかな</button>
+      <button class="type-btn" data-type="crab">🦀 カニ</button>
+      <button class="type-btn" data-type="octopus">🐙 タコ</button>
+    </div>
+  </div>
 
   <div class="canvas-container">
-    <canvas id="drawCanvas"></canvas>
+    <canvas id="paintCanvas" class="cursor-pen"></canvas>
   </div>
 
   <div class="toolbar">
-    <!-- ツール切り替え -->
-    <div class="tool-selector">
-      <button class="btn-tool active" id="btnPen" onclick="setTool('pen')">✏️ ペン</button>
-      <button class="btn-tool" id="btnFill" onclick="setTool('fill')">🪣 ぬりつぶし</button>
-    </div>
-
-    <!-- カラーパレット -->
-    <div class="colors">
-      <div class="color-btn active" style="background:#000000;" onclick="setPenColor('#000000', this)"></div>
-      <div class="color-btn" style="background:#e53935;" onclick="setPenColor('#e53935', this)"></div>
-      <div class="color-btn" style="background:#1e88e5;" onclick="setPenColor('#1e88e5', this)"></div>
-      <div class="color-btn" style="background:#43a047;" onclick="setPenColor('#43a047', this)"></div>
-      <div class="color-btn" style="background:#fdd835;" onclick="setPenColor('#fdd835', this)"></div>
-      <div class="color-btn" style="background:#fb8c00;" onclick="setPenColor('#fb8c00', this)"></div>
-      <div class="color-btn" style="background:#d81b60;" onclick="setPenColor('#d81b60', this)"></div>
-      <div class="color-btn" style="background:#8d6e63;" onclick="setPenColor('#8d6e63', this)"></div>
-    </div>
-  </div>
-
-  <div class="controls">
-    <button class="btn-clear" onclick="clearCanvas()">🗑️ けす</button>
-    <button class="btn-send" onclick="openChoiceModal()">🚀 およがせる！</button>
-  </div>
-
-  <!-- マナー案内 ＆ 生物選択モーダル -->
-  <div class="modal-overlay" id="choiceModal">
-    <div class="modal-card">
-      <div class="modal-notice">
-        ⚠️ おねがい<br>
-        みんなが たのしくあそべるように、ひとを きずつける ことばや 絵は かいていないかな？
+    <div class="tool-row">
+      <div class="btn-group">
+        <!-- ツールボタン -->
+        <button class="tool-btn active" id="btnPen">✏️ ペン</button>
+        <!-- ★ 4. 消しゴムボタン -->
+        <button class="tool-btn" id="btnEraser">🧹 けしごむ</button>
+        <!-- ★ 1. 塗りつぶしボタン -->
+        <button class="tool-btn" id="btnBucket">🪣 ぬりつぶし</button>
       </div>
 
-      <div class="modal-title">どれで およがせる？</div>
-
-      <div class="modal-buttons">
-        <button class="btn-choice choice-fish" onclick="selectAndSend('fish')">🐟 さかな</button>
-        <button class="btn-choice choice-crab" onclick="selectAndSend('crab')">🦀 カニ</button>
-        <button class="btn-choice choice-octopus" onclick="selectAndSend('octopus')">🐙 たこ・くらげ</button>
-        <button class="btn-choice btn-back" onclick="closeChoiceModal()">← かきなおす</button>
+      <div class="btn-group">
+        <!-- ★ 3. 一つ前に戻すボタン -->
+        <button class="tool-btn" id="btnUndo" disabled>↩️ もどす</button>
+        <button class="tool-btn" id="btnClear">🗑️ けす</button>
       </div>
     </div>
-  </div>
 
-  <div id="loadingOverlay">
-    <div style="font-size: 3.5rem;">🚀</div>
-    <div style="margin-top: 10px;">すいぞくかんへ おくっているよ...</div>
+    <div class="tool-row">
+      <!-- カラーパレット -->
+      <div class="color-palette" id="colorPalette"></div>
+
+      <!-- 送信ボタン -->
+      <button class="send-btn" id="btnSend">🚀 すいぞくかんへ！</button>
+    </div>
   </div>
 
   <script type="module">
@@ -211,223 +190,270 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    const canvas = document.getElementById('drawCanvas');
+    const canvas = document.getElementById('paintCanvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    const loadingOverlay = document.getElementById('loadingOverlay');
+    const toast = document.getElementById('toast');
 
+    // 状態管理
+    let currentMode = 'pen'; // 'pen', 'eraser', 'bucket'
+    let currentColor = '#ff2a6d';
+    let currentType = 'fish';
     let isDrawing = false;
-    let currentColor = '#000000';
-    let currentLineWidth = 8;
-    let currentTool = 'pen'; // 'pen' | 'fill'
-    let hasDrawn = false;
+    let lastX = 0, lastY = 0;
 
+    // ★ 3. Undo用 履歴スタック
+    const historyStack = [];
+    const MAX_HISTORY = 15;
+
+    // パレット用のカラー
+    const COLORS = [
+      '#ff2a6d', '#ff7043', '#ffca28', '#66bb6a', 
+      '#29b6f6', '#ab47bc', '#8d6e63', '#212121'
+    ];
+
+    // キャンバスリサイズ設定
     function resizeCanvas() {
-      const rect = canvas.parentElement.getBoundingClientRect();
-      // 高画質化のため2倍解像度
-      canvas.width = rect.width * 2;
-      canvas.height = rect.height * 2;
-      ctx.scale(2, 2);
+      const container = canvas.parentElement;
+      const rect = container.getBoundingClientRect();
+      
+      // 一時保存
+      const tempImage = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      
+      canvas.width = rect.width - 8;
+      canvas.height = Math.min(rect.width * 0.75, window.innerHeight * 0.55);
+      
+      // 初期背景（透明）
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
+      
+      if (tempImage.width > 0) {
+        ctx.putImageData(tempImage, 0, 0);
+      }
     }
+
     window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
 
-    window.setTool = function(tool) {
-      currentTool = tool;
-      document.getElementById('btnPen').classList.toggle('active', tool === 'pen');
-      document.getElementById('btnFill').classList.toggle('active', tool === 'fill');
-    };
+    // ★ 3. 状態保存（Undo用）
+    function saveHistory() {
+      if (historyStack.length >= MAX_HISTORY) {
+        historyStack.shift();
+      }
+      historyStack.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+      document.getElementById('btnUndo').disabled = false;
+    }
 
-    window.setPenColor = function(color, btn) {
-      currentColor = color;
-      document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    };
+    // ★ 3. 一つ前に戻す実行
+    function undo() {
+      if (historyStack.length > 0) {
+        const previousState = historyStack.pop();
+        ctx.putImageData(previousState, 0, 0);
+        if (historyStack.length === 0) {
+          document.getElementById('btnUndo').disabled = true;
+        }
+      }
+    }
 
+    // モード切替処理（★ 1. カーソル変更込み）
+    function setMode(mode) {
+      currentMode = mode;
+      
+      document.getElementById('btnPen').classList.toggle('active', mode === 'pen');
+      document.getElementById('btnEraser').classList.toggle('active', mode === 'eraser');
+      document.getElementById('btnBucket').classList.toggle('active', mode === 'bucket');
+
+      canvas.className = '';
+      if (mode === 'pen') canvas.classList.add('cursor-pen');
+      if (mode === 'eraser') canvas.classList.add('cursor-eraser');
+      if (mode === 'bucket') canvas.classList.add('cursor-bucket'); // ★ ペンキマーク
+    }
+
+    // トースト表示
+    function showToast(text) {
+      toast.innerText = text;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 1800);
+    }
+
+    // カラーパレット作成
+    const paletteContainer = document.getElementById('colorPalette');
+    COLORS.forEach((color, idx) => {
+      const dot = document.createElement('div');
+      dot.className = `color-dot ${idx === 0 ? 'active' : ''}`;
+      dot.style.backgroundColor = color;
+      dot.addEventListener('click', () => {
+        document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+        dot.classList.add('active');
+        currentColor = color;
+        if (currentMode === 'eraser') setMode('pen'); // 色を選んだらペンへ
+      });
+      paletteContainer.appendChild(dot);
+    });
+
+    // 生物タイプ選択
+    document.querySelectorAll('.type-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentType = btn.dataset.type;
+      });
+    });
+
+    // 描画イベント handlers
     function getPos(e) {
       const rect = canvas.getBoundingClientRect();
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
       return {
-        x: clientX - rect.left,
-        y: clientY - rect.top
+        x: Math.round((clientX - rect.left) * (canvas.width / rect.width)),
+        y: Math.round((clientY - rect.top) * (canvas.height / rect.height))
       };
     }
 
-    // HEXカラーをRGBAに変換
-    function hexToRgba(hex) {
-      const c = hex.replace('#', '');
-      return [
-        parseInt(c.substring(0, 2), 16),
-        parseInt(c.substring(2, 4), 16),
-        parseInt(c.substring(4, 6), 16),
-        255
-      ];
-    }
+    // ★ 1＆2. バケツ塗りつぶし（Flood Fill）アルゴリズム
+    function floodFill(startX, startY, fillColorHex) {
+      saveHistory();
 
-    // 高速塗りつぶし（Flood Fill）アルゴリズム
-    function floodFill(startX, startY, fillColor) {
-      const targetX = Math.floor(startX * 2);
-      const targetY = Math.floor(startY * 2);
-      const w = canvas.width;
-      const h = canvas.height;
-
-      const imgData = ctx.getImageData(0, 0, w, h);
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imgData.data;
+      const width = canvas.width;
+      const height = canvas.height;
 
-      const startIdx = (targetY * w + targetX) * 4;
-      const startR = data[startIdx];
-      const startG = data[startIdx + 1];
-      const startB = data[startIdx + 2];
-      const startA = data[startIdx + 3];
+      // HexカラーをRGBAへ変換
+      const r = parseInt(fillColorHex.slice(1, 3), 16);
+      const g = parseInt(fillColorHex.slice(3, 5), 16);
+      const b = parseInt(fillColorHex.slice(5, 7), 16);
+      const a = 255;
 
-      const [fillR, fillG, fillB, fillA] = hexToRgba(fillColor);
+      const targetIdx = (startY * width + startX) * 4;
+      const startR = data[targetIdx];
+      const startG = data[targetIdx + 1];
+      const startB = data[targetIdx + 2];
+      const startA = data[targetIdx + 3];
 
-      // すでに同じ色の場合は処理スキップ
-      if (startR === fillR && startG === fillG && startB === fillB && startA === fillA) return;
+      // 同じ色なら塗りつぶさない
+      if (startR === r && startG === g && startB === b && startA === a) return;
 
-      function matchStartColor(pixelIdx) {
-        const r = data[pixelIdx];
-        const g = data[pixelIdx + 1];
-        const b = data[pixelIdx + 2];
-        const a = data[pixelIdx + 3];
+      const queue = [[startX, startY]];
+      const matchColor = (idx) => {
+        return Math.abs(data[idx] - startR) < 30 &&
+               Math.abs(data[idx+1] - startG) < 30 &&
+               Math.abs(data[idx+2] - startB) < 30 &&
+               Math.abs(data[idx+3] - startA) < 30;
+      };
 
-        // 輪郭アンチエイリアス境界のための色差許容（Tolerance）
-        return Math.abs(r - startR) < 30 &&
-               Math.abs(g - startG) < 30 &&
-               Math.abs(b - startB) < 30 &&
-               Math.abs(a - startA) < 30;
-      }
+      while (queue.length > 0) {
+        const [x, y] = queue.pop();
+        const idx = (y * width + x) * 4;
 
-      const pixelStack = [[targetX, targetY]];
+        if (x < 0 || x >= width || y < 0 || y >= height) continue;
 
-      while (pixelStack.length > 0) {
-        const [x, y] = pixelStack.pop();
-        let currY = y;
-        let idx = (currY * w + x) * 4;
+        if (matchColor(idx)) {
+          data[idx] = r;
+          data[idx + 1] = g;
+          data[idx + 2] = b;
+          data[idx + 3] = a;
 
-        while (currY >= 0 && matchStartColor(idx)) {
-          currY--;
-          idx -= w * 4;
-        }
-
-        currY++;
-        idx += w * 4;
-
-        let reachLeft = false;
-        let reachRight = false;
-
-        while (currY < h && matchStartColor(idx)) {
-          data[idx] = fillR;
-          data[idx + 1] = fillG;
-          data[idx + 2] = fillB;
-          data[idx + 3] = fillA;
-
-          if (x > 0) {
-            if (matchStartColor(idx - 4)) {
-              if (!reachLeft) {
-                pixelStack.push([x - 1, currY]);
-                reachLeft = true;
-              }
-            } else if (reachLeft) {
-              reachLeft = false;
-            }
-          }
-
-          if (x < w - 1) {
-            if (matchStartColor(idx + 4)) {
-              if (!reachRight) {
-                pixelStack.push([x + 1, currY]);
-                reachRight = true;
-              }
-            } else if (reachRight) {
-              reachRight = false;
-            }
-          }
-
-          currY++;
-          idx += w * 4;
+          queue.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
         }
       }
 
       ctx.putImageData(imgData, 0, 0);
-      hasDrawn = true;
+
+      // ★ 2. 塗りつぶしたら「自動でペンに戻る」神機能！
+      setMode('pen');
+      showToast('✏️ 自動でペンに戻ったよ！');
     }
 
+    // タッチ＆マウス開始
     function startDraw(e) {
-      const pos = getPos(e);
+      const { x, y } = getPos(e);
 
-      if (currentTool === 'fill') {
-        floodFill(pos.x, pos.y, currentColor);
+      if (currentMode === 'bucket') {
+        floodFill(x, y, currentColor);
         return;
       }
 
+      saveHistory(); // 描画開始前に履歴保持
       isDrawing = true;
-      hasDrawn = true;
-      ctx.beginPath();
-      ctx.moveTo(pos.x, pos.y);
-      ctx.strokeStyle = currentColor;
-      ctx.lineWidth = currentLineWidth;
+      lastX = x;
+      lastY = y;
     }
 
+    // 描画中
     function draw(e) {
-      if (!isDrawing || currentTool !== 'pen') return;
-      e.preventDefault();
-      const pos = getPos(e);
-      ctx.lineTo(pos.x, pos.y);
+      if (!isDrawing) return;
+      const { x, y } = getPos(e);
+
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(x, y);
+
+      if (currentMode === 'eraser') {
+        // ★ 4. 消しゴム（透過消去）
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.lineWidth = 24;
+      } else {
+        // ペン
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = currentColor;
+        ctx.lineWidth = 8;
+      }
+
       ctx.stroke();
+      lastX = x;
+      lastY = y;
     }
 
     function stopDraw() {
       isDrawing = false;
     }
 
-    canvas.addEventListener('mousedown', startDraw);
-    canvas.addEventListener('mousemove', draw);
-    canvas.addEventListener('mouseup', stopDraw);
-    canvas.addEventListener('mouseleave', stopDraw);
+    // イベント登録
+    canvas.addEventListener('pointerdown', startDraw);
+    canvas.addEventListener('pointermove', draw);
+    canvas.addEventListener('pointerup', stopDraw);
+    canvas.addEventListener('pointerleave', stopDraw);
 
-    canvas.addEventListener('touchstart', startDraw, { passive: false });
-    canvas.addEventListener('touchmove', draw, { passive: false });
-    canvas.addEventListener('touchend', stopDraw);
+    // ボタンイベント
+    document.getElementById('btnPen').addEventListener('click', () => setMode('pen'));
+    document.getElementById('btnEraser').addEventListener('click', () => setMode('eraser'));
+    document.getElementById('btnBucket').addEventListener('click', () => setMode('bucket'));
+    document.getElementById('btnUndo').addEventListener('click', undo);
 
-    window.clearCanvas = function() {
+    document.getElementById('btnClear').addEventListener('click', () => {
+      saveHistory();
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      hasDrawn = false;
-    };
+    });
 
-    window.openChoiceModal = function() {
-      if (!hasDrawn) {
-        alert("えが かかれていないよ！なにか かいてみてね。");
+    // Firebaseへ送信
+    document.getElementById('btnSend').addEventListener('click', () => {
+      const dataURL = canvas.toDataURL('image/png');
+      
+      // 空白チェック
+      const blank = document.createElement('canvas');
+      blank.width = canvas.width;
+      blank.height = canvas.height;
+      if (canvas.toDataURL() === blank.toDataURL()) {
+        alert("絵を描いてから送ってね！");
         return;
       }
-      document.getElementById('choiceModal').style.display = 'flex';
-    };
 
-    window.closeChoiceModal = function() {
-      document.getElementById('choiceModal').style.display = 'none';
-    };
-
-    window.selectAndSend = function(type) {
-      document.getElementById('choiceModal').style.display = 'none';
-      loadingOverlay.style.display = 'flex';
-
-      const dataURL = canvas.toDataURL("image/png");
-
-      push(ref(db, 'art_stream'), { 
-        dataURL: dataURL, 
-        type: type,
-        createdAt: Date.now() 
+      push(ref(db, 'art_stream'), {
+        dataURL: dataURL,
+        type: currentType,
+        createdAt: Date.now()
       }).then(() => {
-        loadingOverlay.style.display = 'none';
-        alert("すいぞくかんにおくったよ！");
-        clearCanvas();
-      }).catch(() => {
-        loadingOverlay.style.display = 'none';
-        alert("エラーがおきたよ。もういちどためしてね。");
+        showToast('🎉 すいぞくかんへ 送ったよ！');
+        saveHistory();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }).catch(err => {
+        alert("送信権限エラーです。");
       });
-    };
+    });
+
+    // 初期化実行
+    resizeCanvas();
+    setMode('pen');
   </script>
 </body>
 </html>
