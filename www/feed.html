@@ -64,48 +64,48 @@
     </button>
   </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getDatabase, ref, push } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
-      authDomain: "espu9owen.firebaseapp.com",
-      databaseURL: "https://espu9owen-default-rtdb.firebaseio.com",
-      projectId: "espu9owen",
-      storageBucket: "espu9owen.firebasestorage.app",
-      messagingSenderId: "1003969526788",
-      appId: "1:1003969526788:web:00a61b5a0cc2281de54951",
-      measurementId: "G-GLW0L4Y53H"
-    };
+  const firebaseConfig = {
+    apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
+    authDomain: "espu9owen.firebaseapp.com",
+    databaseURL: "https://espu9owen-default-rtdb.firebaseio.com",
+    projectId: "espu9owen",
+    storageBucket: "espu9owen.firebasestorage.app",
+    messagingSenderId: "1003969526788",
+    appId: "1:1003969526788:web:00a61b5a0cc2281de54951",
+    measurementId: "G-GLW0L4Y53H"
+  };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
 
-    let lastFeedTime = 0;
-    const feedBtn = document.getElementById('feedBtn');
+  let isSending = false;
+  const feedBtn = document.getElementById('feedBtn');
 
-    window.giveFood = function() {
-      const now = Date.now();
-      if (now - lastFeedTime < 200) return; // 0.2秒の連打ガード
-      lastFeedTime = now;
+  window.giveFood = function() {
+    // すでに送信中、または連打時は無視する（0.5秒ガード）
+    if (isSending) return;
+    isSending = true;
 
-      // タップ視覚効果（ボタンがへこむ演出）
-      feedBtn.classList.add('active');
-      setTimeout(() => feedBtn.classList.remove('active'), 100);
+    // タップの見た目の演出
+    feedBtn.classList.add('active');
+    setTimeout(() => feedBtn.classList.remove('active'), 100);
 
-      // 1タップで 2〜3 個のエサを投下
-      const foodCount = Math.floor(Math.random() * 2) + 2; 
-      for (let i = 0; i < foodCount; i++) {
-        setTimeout(() => {
-          push(ref(db, 'feed_stream'), { createdAt: Date.now() })
-            .catch(err => {
-              console.error("エサ送信エラー:", err);
-              alert("送信権限エラーです。Firebaseのルールを確認してください。");
-            });
-        }, i * 100);
-      }
-    };
-  </script>
+    // ★ ループを削除し、1回のタップで「1個」だけ push します
+    push(ref(db, 'feed_stream'), { createdAt: Date.now() })
+      .then(() => {
+        // 0.5秒後に次のタップを許可（連打防止）
+        setTimeout(() => { isSending = false; }, 500);
+      })
+      .catch(err => {
+        console.error("エサ送信エラー:", err);
+        alert("送信エラーが発生しました。");
+        isSending = false;
+      });
+  };
+</script>
 </body>
 </html>
