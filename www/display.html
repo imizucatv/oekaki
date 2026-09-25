@@ -170,6 +170,10 @@
     const activeCreatures = [];
     const activeFoods = [];
 
+    // ★ 重複発火ガード用変数
+    const processedFoodKeys = new Set();
+    const pageStartTime = Date.now();
+
     document.body.addEventListener('dblclick', () => {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(() => {});
@@ -203,38 +207,36 @@
       const elapsedTime = now - createdAt;
 
       if (elapsedTime >= MAX_LIFETIME) {
-        remove(snapshot.ref);
+        remove(snapshot.ref).catch(() => {});
       } else {
         const remainingLife = MAX_LIFETIME - elapsedTime;
         createFloatingArt(data.dataURL, data.type || 'fish', snapshot.ref, remainingLife);
       }
     });
 
-    // 画面ロード時刻の記録
-    const pageStartTime = Date.now();
-
-    // ★ エサ受信処理（厳密なガード処理に修正）
+    // ★ エサ受信処理（重複処理の修正箇所）
     onChildAdded(ref(db, 'feed_stream'), (snapshot) => {
+      // 画面上で処理済みのIDは二度と落とさない
+      if (processedFoodKeys.has(snapshot.key)) return;
+      processedFoodKeys.add(snapshot.key);
+
       const data = snapshot.val();
 
-      // 1. createdAt が未定義、または数値でないデータは過去の破損ログとして削除
       if (!data || typeof data.createdAt !== 'number') {
-        remove(snapshot.ref);
+        remove(snapshot.ref).catch(() => {});
         return;
       }
 
       const now = Date.now();
       const createdAt = data.createdAt;
 
-      // 2. 画面起動前に読み込まれた過去ログ、または10秒以上古いエサは即座に削除
       if (createdAt < pageStartTime - 1000 || (now - createdAt) > 10000) {
-        remove(snapshot.ref);
+        remove(snapshot.ref).catch(() => {});
         return;
       }
 
-      // 3. 正常なエサのみ落下を実行
       dropFood();
-      remove(snapshot.ref);
+      remove(snapshot.ref).catch(() => {});
     });
 
     function dropFood() {
@@ -565,7 +567,7 @@
 
           setTimeout(() => {
             container.remove();
-            if (dbRef) remove(dbRef);
+            if (dbRef) remove(dbRef).catch(() => {});
           }, 3000);
         }, remainingLife);
 
