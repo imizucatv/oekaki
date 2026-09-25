@@ -1,12 +1,12 @@
 {
   "name": "aquarium-app",
-  "version": "1.0.0",
-  "description": "",
+  "version": "1.0.1",
+  "description": "Ç›ÇÒÇ»ÇÃÇÌÇ≠ÇÌÇ≠êÖë∞äŸ",
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win nsis --x64"
+    "build:win": "electron-builder --win portable --x64"
   },
   "keywords": [],
   "author": "",
@@ -33,6 +33,9 @@
         "dmg",
         "zip"
       ]
+    },
+    "win": {
+      "target": "portable"
     }
   }
 }
