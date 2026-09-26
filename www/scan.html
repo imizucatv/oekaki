@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>お絵描きスキャナー</title>
+  <title>お絵描きスキャナー - スマート被写体抽出</title>
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -15,25 +15,24 @@
       margin: 0; padding: 0;
       width: 100%; height: 100dvh;
       overflow: hidden; touch-action: none;
-      background-color: #1a1a1a; font-family: sans-serif;
+      background-color: #111; font-family: sans-serif;
       display: flex; flex-direction: column;
       align-items: center; justify-content: space-between;
       color: #fff;
     }
 
     .header {
-      padding: 8px 12px; font-size: 1rem; font-weight: bold;
-      text-align: center; background: rgba(0,0,0,0.6); width: 100%;
+      padding: 8px 12px; font-size: 0.95rem; font-weight: bold;
+      text-align: center; background: rgba(0,0,0,0.7); width: 100%;
       flex-shrink: 0;
     }
 
-    /* 💡可変レイアウト：余った縦幅をカメラがぴったり占有 */
     .camera-container {
       position: relative; width: 92vw; max-width: 600px;
       flex: 1; margin: 8px 0;
       display: flex; justify-content: center; align-items: center;
       overflow: hidden; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-      background: #2a2a2a;
+      background: #222;
     }
 
     video { width: 100%; height: 100%; object-fit: cover; }
@@ -61,10 +60,9 @@
       border-radius: 20px; font-size: 0.9rem; font-weight: bold;
     }
 
-    /* 💡絶対画面内に入る操作エリア */
     .controls {
       padding: 12px 16px; display: flex; gap: 12px; justify-content: center;
-      width: 100%; background: rgba(0,0,0,0.8); flex-shrink: 0;
+      width: 100%; background: rgba(0,0,0,0.85); flex-shrink: 0;
     }
 
     button {
@@ -96,12 +94,12 @@
 
     #loadingOverlay {
       display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh;
-      background: rgba(0,0,0,0.75); z-index: 200;
+      background: rgba(0,0,0,0.8); z-index: 200;
       flex-direction: column; align-items: center; justify-content: center;
     }
     
     .spinner-text {
-      color: #fff; font-size: 1.3rem; font-weight: bold; margin-top: 15px;
+      color: #fff; font-size: 1.2rem; font-weight: bold; margin-top: 15px;
       animation: pulse 1s infinite alternate;
     }
 
@@ -142,8 +140,8 @@
   </div>
 
   <div id="loadingOverlay">
-    <div style="font-size: 3.5rem;">✨</div>
-    <div class="spinner-text" id="loadingText">きれいに 切りぬいているよ...</div>
+    <div style="font-size: 3.5rem;">🔍</div>
+    <div class="spinner-text" id="loadingText">生きものを 自動で見つけているよ...</div>
   </div>
 
   <canvas id="processCanvas"></canvas>
@@ -192,7 +190,7 @@
 
     window.startCapture = function() {
       if (!video.videoWidth || !video.videoHeight) return;
-      loadingText.innerText = "✨ きれいに 切りぬいているよ...";
+      loadingText.innerText = "🔍 生きものを 自動で見つけているよ...";
       loadingOverlay.style.display = 'flex';
       setTimeout(() => { processImage(); }, 50);
     };
@@ -241,24 +239,22 @@
       const imgData = ctx.getImageData(0, 0, cropW, cropH);
       const data = imgData.data;
 
-      // 💡1. 外側余白（紙地）の色基準（4隅の平均）
+      // 1. 背景紙の色サンプリング（四隅）
       const cornerR = (data[0] + data[(cropW - 1) * 4] + data[(cropH - 1) * cropW * 4]) / 3;
       const cornerG = (data[1] + data[(cropW - 1) * 4 + 1] + data[(cropH - 1) * cropW * 4 + 1]) / 3;
       const cornerB = (data[2] + data[(cropW - 1) * 4 + 2] + data[(cropH - 1) * cropW * 4 + 2]) / 3;
 
-      // 純粋な背景紙判定（余計な色や線に触れたらすぐ止まる安全な許容範囲）
       const isPurePaper = (r, g, b) => {
         const diffR = Math.abs(r - cornerR);
         const diffG = Math.abs(g - cornerG);
         const diffB = Math.abs(b - cornerB);
         const brightness = (r + g + b) / 3;
-        return (diffR < 18 && diffG < 18 && diffB < 18 && brightness > 165);
+        return (diffR < 20 && diffG < 20 && diffB < 20 && brightness > 155);
       };
 
-      // 💡2. Flood Fill（外側の紙だけをミリ単位で削除し、イラスト内部の色は一切書き換えない）
+      // 2. 背景（余白）の消去（Flood Fill）
       const visited = new Uint8Array(cropW * cropH);
       const queue = [0, cropW - 1, (cropH - 1) * cropW, cropW * cropH - 1];
-
       queue.forEach(idx => visited[idx] = 1);
 
       while (queue.length > 0) {
@@ -266,7 +262,7 @@
         const pIdx = curr * 4;
 
         if (isPurePaper(data[pIdx], data[pIdx + 1], data[pIdx + 2])) {
-          data[pIdx + 3] = 0; // 外側の紙だけ透明にする
+          data[pIdx + 3] = 0; // 背景を透明化
 
           const x = curr % cropW;
           const y = Math.floor(curr / cropW);
@@ -286,29 +282,140 @@
         }
       }
 
-      // 💡3. 有効範囲（イラストのバウンディングボックス）の計算
+      // 💡3. 残った描画物を「島（クラスタ）」として解析
+      const visitedClusters = new Uint8Array(cropW * cropH);
+      const clusters = [];
+
+      for (let y = 0; y < cropH; y += 2) {
+        for (let x = 0; x < cropW; x += 2) {
+          const startIdx = y * cropW + x;
+          if (data[startIdx * 4 + 3] > 0 && !visitedClusters[startIdx]) {
+            const clusterPixels = [];
+            const cQueue = [startIdx];
+            visitedClusters[startIdx] = 1;
+
+            let cMinX = x, cMaxX = x, cMinY = y, cMaxY = y;
+            let touchesEdge = false;
+            let coloredPixelCount = 0;
+
+            while (cQueue.length > 0) {
+              const curr = cQueue.pop();
+              clusterPixels.push(curr);
+              const cx = curr % cropW;
+              const cy = Math.floor(curr / cropW);
+
+              // 画像の枠（端っこ）に触れているかチェック
+              if (cx <= 4 || cx >= cropW - 5 || cy <= 4 || cy >= cropH - 5) {
+                touchesEdge = true;
+              }
+
+              const pIdx = curr * 4;
+              const r = data[pIdx], g = data[pIdx + 1], b = data[pIdx + 2];
+              const colorDiff = Math.max(r, g, b) - Math.min(r, g, b);
+              if (colorDiff > 16) coloredPixelCount++;
+
+              if (cx < cMinX) cMinX = cx; if (cx > cMaxX) cMaxX = cx;
+              if (cy < cMinY) cMinY = cy; if (cy > cMaxY) cMaxY = cy;
+
+              const neighbors = [
+                cy > 1 ? curr - cropW * 2 : -1,
+                cy < cropH - 2 ? curr + cropW * 2 : -1,
+                cx > 1 ? curr - 2 : -1,
+                cx < cropW - 2 ? curr + 2 : -1
+              ];
+
+              for (const n of neighbors) {
+                if (n >= 0 && data[n * 4 + 3] > 0 && !visitedClusters[n]) {
+                  visitedClusters[n] = 1;
+                  cQueue.push(n);
+                }
+              }
+            }
+
+            clusters.push({
+              pixels: clusterPixels,
+              minX: cMinX, maxX: cMaxX, minY: cMinY, maxY: cMaxY,
+              touchesEdge,
+              colorRatio: coloredPixelCount / clusterPixels.length,
+              pixelCount: clusterPixels.length
+            });
+          }
+        }
+      }
+
+      // 💡4. 黒枠・雑線の撃退 ＆ メインの「生き物」決定
+      const centerX = cropW / 2;
+      const centerY = cropH / 2;
+
+      clusters.forEach(c => {
+        const cCenterX = (c.minX + c.maxX) / 2;
+        const cCenterY = (c.minY + c.maxY) / 2;
+        const distFromCenter = Math.hypot(cCenterX - centerX, cCenterY - centerY);
+
+        // 端に接している黒枠や無彩色の壁はペナルティ（評価ダウン）
+        let edgePenalty = (c.touchesEdge && c.colorRatio < 0.25) ? 0.01 : 1.0;
+
+        // スコア算出（色がある・中央に近い・サイズがある島が高評価）
+        c.score = (c.pixelCount * (1 + c.colorRatio * 4) * edgePenalty) / (distFromCenter + 40);
+      });
+
+      clusters.sort((a, b) => b.score - a.score);
+      const mainCreature = clusters[0];
+
+      if (!mainCreature || mainCreature.score < 0.5) {
+        loadingOverlay.style.display = 'none';
+        alert("生きものが見つからなかったよ！もう少し枠に近づけてみてね。");
+        return;
+      }
+
+      // メイン生き物の領域
+      const mainBB = {
+        minX: mainCreature.minX, maxX: mainCreature.maxX,
+        minY: mainCreature.minY, maxY: mainCreature.maxY
+      };
+
+      // 生き物本体、または近接パーツ（目や泡など）以外（黒枠や端のゴミ）を消去
+      const validPixelSet = new Set();
+      clusters.forEach(c => {
+        // 端に接している無彩色の黒枠は消去
+        if (c.touchesEdge && c.colorRatio < 0.2) return;
+
+        // 主役に十分近い場所にある島は生き物のパーツと判定して残す
+        const isNearMain = !(c.maxX < mainBB.minX - 50 || c.minX > mainBB.maxX + 50 ||
+                             c.maxY < mainBB.minY - 50 || c.minY > mainBB.maxY + 50);
+
+        if (c === mainCreature || (isNearMain && c.pixelCount > 15)) {
+          c.pixels.forEach(p => validPixelSet.add(p));
+        }
+      });
+
+      // 不要ピクセルの完全削除（透明化）
       let minX = cropW, maxX = 0, minY = cropH, maxY = 0;
       let hasContent = false;
 
       for (let y = 0; y < cropH; y++) {
         for (let x = 0; x < cropW; x++) {
-          const idx = (y * cropW + x) * 4;
-          if (data[idx + 3] !== 0) { // 透明になっていない（描画物）部分
+          const idx = y * cropW + x;
+          const pIdx = idx * 4;
+
+          if (validPixelSet.has(idx)) {
             if (x < minX) minX = x; if (x > maxX) maxX = x;
             if (y < minY) minY = y; if (y > maxY) maxY = y;
             hasContent = true;
+          } else {
+            data[pIdx + 3] = 0;
           }
         }
       }
 
       loadingOverlay.style.display = 'none';
 
-      if (!hasContent || minX >= maxX || minY >= maxY) {
-        alert("絵が見つからなかったよ！もう少し枠に近づけてみてね。");
+      if (!hasContent) {
+        alert("絵が見つからなかったよ！もう一度試してみてね。");
         return;
       }
 
-      // 余白カット＆最終描画
+      // 5. クロップ＆プレビュー生成
       const pad = 10;
       minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
       maxX = Math.min(cropW, maxX + pad); maxY = Math.min(cropH, maxY + pad);
