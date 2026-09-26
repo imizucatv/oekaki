@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>お絵描きスキャナー - スマート被写体抽出</title>
+  <title>お絵描きスキャナー</title>
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -103,6 +103,15 @@
       animation: pulse 1s infinite alternate;
     }
 
+    /* 💡フリーズ防止用の安全なメッセージ通知（トースト） */
+    #toastNotice {
+      display: none; position: fixed; top: 20%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(230, 81, 0, 0.95); color: #fff; padding: 12px 24px;
+      border-radius: 30px; font-size: 1.1rem; font-weight: bold;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.5); z-index: 300; pointer-events: none;
+      text-align: center; white-space: nowrap;
+    }
+
     @keyframes pulse {
       0% { opacity: 0.6; transform: scale(0.95); }
       100% { opacity: 1; transform: scale(1.05); }
@@ -141,8 +150,10 @@
 
   <div id="loadingOverlay">
     <div style="font-size: 3.5rem;">🔍</div>
-    <div class="spinner-text" id="loadingText">生きものを 自動で見つけているよ...</div>
+    <div class="spinner-text" id="loadingText">絵を探しているよ...</div>
   </div>
+
+  <div id="toastNotice"></div>
 
   <canvas id="processCanvas"></canvas>
 
@@ -171,9 +182,19 @@
     const previewCanvas = document.getElementById('previewCanvas');
     const loadingOverlay = document.getElementById('loadingOverlay');
     const loadingText = document.getElementById('loadingText');
+    const toastNotice = document.getElementById('toastNotice');
     const ctx = processCanvas.getContext('2d', { willReadFrequently: true });
     
     let processedDataURL = null;
+
+    // トースト通知を表示する安全な関数
+    function showToast(msg) {
+      toastNotice.innerText = msg;
+      toastNotice.style.display = 'block';
+      setTimeout(() => {
+        toastNotice.style.display = 'none';
+      }, 2500);
+    }
 
     async function initCamera() {
       try {
@@ -183,268 +204,273 @@
         });
         video.srcObject = stream;
       } catch (err) {
-        alert("カメラが起動できませんでした。");
+        showToast("カメラをあくせすできませんでした");
       }
     }
     initCamera();
 
     window.startCapture = function() {
       if (!video.videoWidth || !video.videoHeight) return;
-      loadingText.innerText = "🔍 生きものを 自動で見つけているよ...";
+      loadingText.innerText = "🔍 絵を探しているよ...";
       loadingOverlay.style.display = 'flex';
       setTimeout(() => { processImage(); }, 50);
     };
 
     function processImage() {
-      const containerRect = cameraContainer.getBoundingClientRect();
-      const guideRect = guideFrame.getBoundingClientRect();
+      // 💡フリーズ絶対防止：try...finally構造
+      try {
+        const containerRect = cameraContainer.getBoundingClientRect();
+        const guideRect = guideFrame.getBoundingClientRect();
 
-      const vWidth = video.videoWidth;
-      const vHeight = video.videoHeight;
-      const containerRatio = containerRect.width / containerRect.height;
-      const videoRatio = vWidth / vHeight;
+        const vWidth = video.videoWidth;
+        const vHeight = video.videoHeight;
+        const containerRatio = containerRect.width / containerRect.height;
+        const videoRatio = vWidth / vHeight;
 
-      let renderWidth, renderHeight, offsetX, offsetY;
-      if (containerRatio > videoRatio) {
-        renderWidth = containerRect.width;
-        renderHeight = containerRect.width / videoRatio;
-        offsetX = 0;
-        offsetY = (renderHeight - containerRect.height) / 2;
-      } else {
-        renderWidth = containerRect.height * videoRatio;
-        renderHeight = containerRect.height;
-        offsetX = (renderWidth - containerRect.width) / 2;
-        offsetY = 0;
-      }
+        let renderWidth, renderHeight, offsetX, offsetY;
+        if (containerRatio > videoRatio) {
+          renderWidth = containerRect.width;
+          renderHeight = containerRect.width / videoRatio;
+          offsetX = 0;
+          offsetY = (renderHeight - containerRect.height) / 2;
+        } else {
+          renderWidth = containerRect.height * videoRatio;
+          renderHeight = containerRect.height;
+          offsetX = (renderWidth - containerRect.width) / 2;
+          offsetY = 0;
+        }
 
-      const scale = vWidth / renderWidth;
-      const guideLeft = guideRect.left - containerRect.left;
-      const guideTop = guideRect.top - containerRect.top;
+        const scale = vWidth / renderWidth;
+        const guideLeft = guideRect.left - containerRect.left;
+        const guideTop = guideRect.top - containerRect.top;
 
-      const cropX = Math.floor((guideLeft + offsetX) * scale);
-      const cropY = Math.floor((guideTop + offsetY) * scale);
-      const cropW = Math.floor(guideRect.width * scale);
-      const cropH = Math.floor(guideRect.height * scale);
+        const cropX = Math.floor((guideLeft + offsetX) * scale);
+        const cropY = Math.floor((guideTop + offsetY) * scale);
+        const cropW = Math.floor(guideRect.width * scale);
+        const cropH = Math.floor(guideRect.height * scale);
 
-      const rawCanvas = document.createElement('canvas');
-      rawCanvas.width = vWidth;
-      rawCanvas.height = vHeight;
-      const rawCtx = rawCanvas.getContext('2d');
-      rawCtx.drawImage(video, 0, 0);
+        const rawCanvas = document.createElement('canvas');
+        rawCanvas.width = vWidth;
+        rawCanvas.height = vHeight;
+        const rawCtx = rawCanvas.getContext('2d');
+        rawCtx.drawImage(video, 0, 0);
 
-      processCanvas.width = cropW;
-      processCanvas.height = cropH;
-      ctx.drawImage(rawCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+        processCanvas.width = cropW;
+        processCanvas.height = cropH;
+        ctx.drawImage(rawCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
-      const imgData = ctx.getImageData(0, 0, cropW, cropH);
-      const data = imgData.data;
+        const imgData = ctx.getImageData(0, 0, cropW, cropH);
+        const data = imgData.data;
 
-      // 1. 背景紙の色サンプリング（四隅）
-      const cornerR = (data[0] + data[(cropW - 1) * 4] + data[(cropH - 1) * cropW * 4]) / 3;
-      const cornerG = (data[1] + data[(cropW - 1) * 4 + 1] + data[(cropH - 1) * cropW * 4 + 1]) / 3;
-      const cornerB = (data[2] + data[(cropW - 1) * 4 + 2] + data[(cropH - 1) * cropW * 4 + 2]) / 3;
+        // 1. 背景紙の色サンプリング（四隅）
+        const cornerR = (data[0] + data[(cropW - 1) * 4] + data[(cropH - 1) * cropW * 4]) / 3;
+        const cornerG = (data[1] + data[(cropW - 1) * 4 + 1] + data[(cropH - 1) * cropW * 4 + 1]) / 3;
+        const cornerB = (data[2] + data[(cropW - 1) * 4 + 2] + data[(cropH - 1) * cropW * 4 + 2]) / 3;
 
-      const isPurePaper = (r, g, b) => {
-        const diffR = Math.abs(r - cornerR);
-        const diffG = Math.abs(g - cornerG);
-        const diffB = Math.abs(b - cornerB);
-        const brightness = (r + g + b) / 3;
-        return (diffR < 20 && diffG < 20 && diffB < 20 && brightness > 155);
-      };
+        const isPurePaper = (r, g, b) => {
+          const diffR = Math.abs(r - cornerR);
+          const diffG = Math.abs(g - cornerG);
+          const diffB = Math.abs(b - cornerB);
+          const brightness = (r + g + b) / 3;
+          return (diffR < 22 && diffG < 22 && diffB < 22 && brightness > 150);
+        };
 
-      // 2. 背景（余白）の消去（Flood Fill）
-      const visited = new Uint8Array(cropW * cropH);
-      const queue = [0, cropW - 1, (cropH - 1) * cropW, cropW * cropH - 1];
-      queue.forEach(idx => visited[idx] = 1);
+        // 2. 背景（余白）の消去（Flood Fill）
+        const visited = new Uint8Array(cropW * cropH);
+        const queue = [0, cropW - 1, (cropH - 1) * cropW, cropW * cropH - 1];
+        queue.forEach(idx => visited[idx] = 1);
 
-      while (queue.length > 0) {
-        const curr = queue.pop();
-        const pIdx = curr * 4;
+        while (queue.length > 0) {
+          const curr = queue.pop();
+          const pIdx = curr * 4;
 
-        if (isPurePaper(data[pIdx], data[pIdx + 1], data[pIdx + 2])) {
-          data[pIdx + 3] = 0; // 背景を透明化
+          if (isPurePaper(data[pIdx], data[pIdx + 1], data[pIdx + 2])) {
+            data[pIdx + 3] = 0;
 
-          const x = curr % cropW;
-          const y = Math.floor(curr / cropW);
+            const x = curr % cropW;
+            const y = Math.floor(curr / cropW);
 
-          const neighbors = [];
-          if (x > 0) neighbors.push(curr - 1);
-          if (x < cropW - 1) neighbors.push(curr + 1);
-          if (y > 0) neighbors.push(curr - cropW);
-          if (y < cropH - 1) neighbors.push(curr + cropW);
+            const neighbors = [];
+            if (x > 0) neighbors.push(curr - 1);
+            if (x < cropW - 1) neighbors.push(curr + 1);
+            if (y > 0) neighbors.push(curr - cropW);
+            if (y < cropH - 1) neighbors.push(curr + cropW);
 
-          for (const n of neighbors) {
-            if (!visited[n]) {
-              visited[n] = 1;
-              queue.push(n);
+            for (const n of neighbors) {
+              if (!visited[n]) {
+                visited[n] = 1;
+                queue.push(n);
+              }
             }
           }
         }
-      }
 
-      // 💡3. 残った描画物を「島（クラスタ）」として解析
-      const visitedClusters = new Uint8Array(cropW * cropH);
-      const clusters = [];
+        // 3. 描画領域（クラスタ）の解析
+        const visitedClusters = new Uint8Array(cropW * cropH);
+        const clusters = [];
 
-      for (let y = 0; y < cropH; y += 2) {
-        for (let x = 0; x < cropW; x += 2) {
-          const startIdx = y * cropW + x;
-          if (data[startIdx * 4 + 3] > 0 && !visitedClusters[startIdx]) {
-            const clusterPixels = [];
-            const cQueue = [startIdx];
-            visitedClusters[startIdx] = 1;
+        for (let y = 0; y < cropH; y += 2) {
+          for (let x = 0; x < cropW; x += 2) {
+            const startIdx = y * cropW + x;
+            if (data[startIdx * 4 + 3] > 0 && !visitedClusters[startIdx]) {
+              const clusterPixels = [];
+              const cQueue = [startIdx];
+              visitedClusters[startIdx] = 1;
 
-            let cMinX = x, cMaxX = x, cMinY = y, cMaxY = y;
-            let touchesEdge = false;
-            let coloredPixelCount = 0;
+              let cMinX = x, cMaxX = x, cMinY = y, cMaxY = y;
+              let touchesEdge = false;
+              let coloredPixelCount = 0;
 
-            while (cQueue.length > 0) {
-              const curr = cQueue.pop();
-              clusterPixels.push(curr);
-              const cx = curr % cropW;
-              const cy = Math.floor(curr / cropW);
+              while (cQueue.length > 0) {
+                const curr = cQueue.pop();
+                clusterPixels.push(curr);
+                const cx = curr % cropW;
+                const cy = Math.floor(curr / cropW);
 
-              // 画像の枠（端っこ）に触れているかチェック
-              if (cx <= 4 || cx >= cropW - 5 || cy <= 4 || cy >= cropH - 5) {
-                touchesEdge = true;
-              }
+                if (cx <= 4 || cx >= cropW - 5 || cy <= 4 || cy >= cropH - 5) {
+                  touchesEdge = true;
+                }
 
-              const pIdx = curr * 4;
-              const r = data[pIdx], g = data[pIdx + 1], b = data[pIdx + 2];
-              const colorDiff = Math.max(r, g, b) - Math.min(r, g, b);
-              if (colorDiff > 16) coloredPixelCount++;
+                const pIdx = curr * 4;
+                const r = data[pIdx], g = data[pIdx + 1], b = data[pIdx + 2];
+                const colorDiff = Math.max(r, g, b) - Math.min(r, g, b);
+                if (colorDiff > 14) coloredPixelCount++;
 
-              if (cx < cMinX) cMinX = cx; if (cx > cMaxX) cMaxX = cx;
-              if (cy < cMinY) cMinY = cy; if (cy > cMaxY) cMaxY = cy;
+                if (cx < cMinX) cMinX = cx; if (cx > cMaxX) cMaxX = cx;
+                if (cy < cMinY) cMinY = cy; if (cy > cMaxY) cMaxY = cy;
 
-              const neighbors = [
-                cy > 1 ? curr - cropW * 2 : -1,
-                cy < cropH - 2 ? curr + cropW * 2 : -1,
-                cx > 1 ? curr - 2 : -1,
-                cx < cropW - 2 ? curr + 2 : -1
-              ];
+                const neighbors = [
+                  cy > 1 ? curr - cropW * 2 : -1,
+                  cy < cropH - 2 ? curr + cropW * 2 : -1,
+                  cx > 1 ? curr - 2 : -1,
+                  cx < cropW - 2 ? curr + 2 : -1
+                ];
 
-              for (const n of neighbors) {
-                if (n >= 0 && data[n * 4 + 3] > 0 && !visitedClusters[n]) {
-                  visitedClusters[n] = 1;
-                  cQueue.push(n);
+                for (const n of neighbors) {
+                  if (n >= 0 && data[n * 4 + 3] > 0 && !visitedClusters[n]) {
+                    visitedClusters[n] = 1;
+                    cQueue.push(n);
+                  }
                 }
               }
+
+              if (clusterPixels.length > 20) { // 極小ノイズは除去
+                clusters.push({
+                  pixels: clusterPixels,
+                  minX: cMinX, maxX: cMaxX, minY: cMinY, maxY: cMaxY,
+                  touchesEdge,
+                  colorRatio: coloredPixelCount / clusterPixels.length,
+                  pixelCount: clusterPixels.length
+                });
+              }
             }
-
-            clusters.push({
-              pixels: clusterPixels,
-              minX: cMinX, maxX: cMaxX, minY: cMinY, maxY: cMaxY,
-              touchesEdge,
-              colorRatio: coloredPixelCount / clusterPixels.length,
-              pixelCount: clusterPixels.length
-            });
           }
         }
-      }
 
-      // 💡4. 黒枠・雑線の撃退 ＆ メインの「生き物」決定
-      const centerX = cropW / 2;
-      const centerY = cropH / 2;
+        // 💡生き物が全く見つからない場合の処理
+        if (clusters.length === 0) {
+          showToast("絵が見つからなかったよ！もう一度かざしてみてね");
+          resetScan();
+          return;
+        }
 
-      clusters.forEach(c => {
-        const cCenterX = (c.minX + c.maxX) / 2;
-        const cCenterY = (c.minY + c.maxY) / 2;
-        const distFromCenter = Math.hypot(cCenterX - centerX, cCenterY - centerY);
+        // 4. メイン描画物のスコア判定（マイルド化）
+        const centerX = cropW / 2;
+        const centerY = cropH / 2;
 
-        // 端に接している黒枠や無彩色の壁はペナルティ（評価ダウン）
-        let edgePenalty = (c.touchesEdge && c.colorRatio < 0.25) ? 0.01 : 1.0;
+        clusters.forEach(c => {
+          const cCenterX = (c.minX + c.maxX) / 2;
+          const cCenterY = (c.minY + c.maxY) / 2;
+          const distFromCenter = Math.hypot(cCenterX - centerX, cCenterY - centerY);
+          let edgePenalty = (c.touchesEdge && c.colorRatio < 0.2) ? 0.05 : 1.0;
 
-        // スコア算出（色がある・中央に近い・サイズがある島が高評価）
-        c.score = (c.pixelCount * (1 + c.colorRatio * 4) * edgePenalty) / (distFromCenter + 40);
-      });
+          c.score = (c.pixelCount * (1 + c.colorRatio * 3) * edgePenalty) / (distFromCenter + 50);
+        });
 
-      clusters.sort((a, b) => b.score - a.score);
-      const mainCreature = clusters[0];
+        clusters.sort((a, b) => b.score - a.score);
+        
+        // 💡一番スコアの高いものを「メインの絵」として採用
+        const mainCreature = clusters[0];
+        const mainBB = {
+          minX: mainCreature.minX, maxX: mainCreature.maxX,
+          minY: mainCreature.minY, maxY: mainCreature.maxY
+        };
 
-      if (!mainCreature || mainCreature.score < 0.5) {
+        const validPixelSet = new Set();
+        clusters.forEach(c => {
+          if (c.touchesEdge && c.colorRatio < 0.15 && c !== mainCreature) return; // 外枠黒線は弾く
+
+          const isNearMain = !(c.maxX < mainBB.minX - 60 || c.minX > mainBB.maxX + 60 ||
+                               c.maxY < mainBB.minY - 60 || c.minY > mainBB.maxY + 60);
+
+          if (c === mainCreature || isNearMain) {
+            c.pixels.forEach(p => validPixelSet.add(p));
+          }
+        });
+
+        let minX = cropW, maxX = 0, minY = cropH, maxY = 0;
+        let hasContent = false;
+
+        for (let y = 0; y < cropH; y++) {
+          for (let x = 0; x < cropW; x++) {
+            const idx = y * cropW + x;
+            const pIdx = idx * 4;
+
+            if (validPixelSet.has(idx)) {
+              if (x < minX) minX = x; if (x > maxX) maxX = x;
+              if (y < minY) minY = y; if (y > maxY) maxY = y;
+              hasContent = true;
+            } else {
+              data[pIdx + 3] = 0;
+            }
+          }
+        }
+
+        if (!hasContent) {
+          showToast("絵が見つからなかったよ！もう少し近づけてね");
+          resetScan();
+          return;
+        }
+
+        // 5. プレビュー生成
+        const pad = 10;
+        minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
+        maxX = Math.min(cropW, maxX + pad); maxY = Math.min(cropH, maxY + pad);
+
+        const srcW = maxX - minX, srcH = maxY - minY;
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = cropW; tempCanvas.height = cropH;
+        tempCanvas.getContext('2d').putImageData(imgData, 0, 0);
+
+        const targetSize = 500;
+        previewCanvas.width = targetSize; previewCanvas.height = targetSize;
+
+        const pCtx = previewCanvas.getContext('2d');
+        pCtx.clearRect(0, 0, targetSize, targetSize);
+
+        const fitScale = Math.min((targetSize - 20) / srcW, (targetSize - 20) / srcH);
+        const destW = srcW * fitScale, destH = srcH * fitScale;
+        const destX = (targetSize - destW) / 2, destY = (targetSize - destH) / 2;
+
+        pCtx.drawImage(tempCanvas, minX, minY, srcW, srcH, destX, destY, destW, destH);
+        processedDataURL = previewCanvas.toDataURL("image/png");
+
+        video.style.display = 'none';
+        document.getElementById('guideFrame').style.display = 'none';
+        previewCanvas.style.display = 'block';
+
+        document.getElementById('btnScan').style.display = 'none';
+        document.getElementById('btnRetry').style.display = 'inline-block';
+        document.getElementById('btnSend').style.display = 'inline-block';
+
+      } catch (err) {
+        console.error("スキャン失敗:", err);
+        showToast("うまく読み込めなかったよ！もう一度撮影してね");
+        resetScan();
+      } finally {
+        // 💡どんなエラーが起きても絶対にローディング画面を消して元に戻す！
         loadingOverlay.style.display = 'none';
-        alert("生きものが見つからなかったよ！もう少し枠に近づけてみてね。");
-        return;
       }
-
-      // メイン生き物の領域
-      const mainBB = {
-        minX: mainCreature.minX, maxX: mainCreature.maxX,
-        minY: mainCreature.minY, maxY: mainCreature.maxY
-      };
-
-      // 生き物本体、または近接パーツ（目や泡など）以外（黒枠や端のゴミ）を消去
-      const validPixelSet = new Set();
-      clusters.forEach(c => {
-        // 端に接している無彩色の黒枠は消去
-        if (c.touchesEdge && c.colorRatio < 0.2) return;
-
-        // 主役に十分近い場所にある島は生き物のパーツと判定して残す
-        const isNearMain = !(c.maxX < mainBB.minX - 50 || c.minX > mainBB.maxX + 50 ||
-                             c.maxY < mainBB.minY - 50 || c.minY > mainBB.maxY + 50);
-
-        if (c === mainCreature || (isNearMain && c.pixelCount > 15)) {
-          c.pixels.forEach(p => validPixelSet.add(p));
-        }
-      });
-
-      // 不要ピクセルの完全削除（透明化）
-      let minX = cropW, maxX = 0, minY = cropH, maxY = 0;
-      let hasContent = false;
-
-      for (let y = 0; y < cropH; y++) {
-        for (let x = 0; x < cropW; x++) {
-          const idx = y * cropW + x;
-          const pIdx = idx * 4;
-
-          if (validPixelSet.has(idx)) {
-            if (x < minX) minX = x; if (x > maxX) maxX = x;
-            if (y < minY) minY = y; if (y > maxY) maxY = y;
-            hasContent = true;
-          } else {
-            data[pIdx + 3] = 0;
-          }
-        }
-      }
-
-      loadingOverlay.style.display = 'none';
-
-      if (!hasContent) {
-        alert("絵が見つからなかったよ！もう一度試してみてね。");
-        return;
-      }
-
-      // 5. クロップ＆プレビュー生成
-      const pad = 10;
-      minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
-      maxX = Math.min(cropW, maxX + pad); maxY = Math.min(cropH, maxY + pad);
-
-      const srcW = maxX - minX, srcH = maxY - minY;
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = cropW; tempCanvas.height = cropH;
-      tempCanvas.getContext('2d').putImageData(imgData, 0, 0);
-
-      const targetSize = 500;
-      previewCanvas.width = targetSize; previewCanvas.height = targetSize;
-
-      const pCtx = previewCanvas.getContext('2d');
-      pCtx.clearRect(0, 0, targetSize, targetSize);
-
-      const fitScale = Math.min((targetSize - 20) / srcW, (targetSize - 20) / srcH);
-      const destW = srcW * fitScale, destH = srcH * fitScale;
-      const destX = (targetSize - destW) / 2, destY = (targetSize - destH) / 2;
-
-      pCtx.drawImage(tempCanvas, minX, minY, srcW, srcH, destX, destY, destW, destH);
-      processedDataURL = previewCanvas.toDataURL("image/png");
-
-      video.style.display = 'none';
-      document.getElementById('guideFrame').style.display = 'none';
-      previewCanvas.style.display = 'block';
-
-      document.getElementById('btnScan').style.display = 'none';
-      document.getElementById('btnRetry').style.display = 'inline-block';
-      document.getElementById('btnSend').style.display = 'inline-block';
     }
 
     window.resetScan = function() {
@@ -474,12 +500,12 @@
         createdAt: Date.now() 
       }).then(() => {
         loadingOverlay.style.display = 'none';
-        alert("すいぞくかんにおくったよ！");
+        showToast("✨ すいぞくかんにおくったよ！");
         resetScan();
       }).catch((err) => {
         console.error(err);
         loadingOverlay.style.display = 'none';
-        alert("エラーがおきたよ: " + (err.message || "送信失敗"));
+        showToast("送信に失敗しちゃった");
       });
     };
   </script>
