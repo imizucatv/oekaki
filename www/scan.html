@@ -11,10 +11,10 @@
   <style>
     html, body {
       margin: 0; padding: 0;
-      width: 100%; /* 100vwから100%に変更して横揺れ防止 */
+      width: 100%;
       height: 100dvh;
       overflow: hidden;
-      touch-action: none; /* スマホ操作中の画面スクロール・ズレを防止 */
+      touch-action: none;
       background-color: #222;
       font-family: sans-serif;
       display: flex; flex-direction: column;
@@ -349,6 +349,17 @@
       if (innerTop === 0) innerTop = Math.floor(cropH * 0.1);
       if (innerBottom === cropH) innerBottom = Math.floor(cropH * 0.9);
 
+      // 💡【背景校正】枠内全体の「紙の平均的な白さ」を高速サンプリングで算出
+      let sumBg = 0, bgCount = 0;
+      for (let i = 0; i < data.length; i += 16) {
+        const b = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        if (b > 160) {
+          sumBg += b;
+          bgCount++;
+        }
+      }
+      const paperWhite = bgCount > 0 ? (sumBg / bgCount) : 240;
+
       let minX = cropW, maxX = 0, minY = cropH, maxY = 0;
       let hasContent = false;
 
@@ -364,9 +375,11 @@
           const colorDiff = Math.max(r, g, b) - Math.min(r, g, b);
 
           const isBlackLine = (brightness < 90);
-          const isColoredLine = (colorDiff >= 22) && (brightness < 225);
+          const isColoredLine = (colorDiff >= 15) && (brightness < 235);
+          // 💡紙の白地（paperWhite）と比べてわずかでも陰影があれば「銀色・淡色・薄塗り」として判定！
+          const isSilverOrThinShade = (paperWhite - brightness > 22);
 
-          if (isBlackLine || isColoredLine) {
+          if (isBlackLine || isColoredLine || isSilverOrThinShade) {
             data[idx + 3] = 255;
             if (x < minX) minX = x; if (x > maxX) maxX = x;
             if (y < minY) minY = y; if (y > maxY) maxY = y;
