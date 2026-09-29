@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>みんなの水族館 - 3D Ultra Edition</title>
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="みんなの水族館">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <style>
+    html, body { 
+      margin: 0; padding: 0;
+      overflow: hidden; 
+      width: 100vw; height: 100vh; height: 100dvh;
+      background: linear-gradient(180deg, #0288d1 0%, #01579b 55%, #002f6c 100%);
+      position: relative; font-family: sans-serif;
+      overscroll-behavior: none; user-select: none;
+    }
+
+    #webgl-container {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 1;
+    }
+
+    .sunbeams {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: repeating-linear-gradient(
+        110deg,
+        rgba(255, 255, 255, 0.15) 0px,
+        rgba(255, 255, 255, 0.15) 40px,
+        transparent 40px,
+        transparent 110px
+      );
+      pointer-events: none; z-index: 2;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="sunbeams"></div>
+  <div id="webgl-container"></div>
+
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, onChildAdded, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // --- Firebase 設定 ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyC0FLLOsSAd3fYvI1OI1KSUARostoV5HVM",
+      authDomain: "espu9owen.firebaseapp.com",
+      databaseURL: "https://espu9owen-default-rtdb.firebaseio.com",
+      projectId: "espu9owen",
+      storageBucket: "espu9owen.firebasestorage.app",
+      messagingSenderId: "1003969526788",
+      appId: "1:1003969526788:web:00a61b5a0cc2281de54951",
+      measurementId: "G-GLW0L4Y53H"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const processedFoodKeys = new Set();
+    const pageStartTime = Date.now();
+    const MAX_LIFETIME = 120000;
+
+    // --- Three.js 基本環境 ---
+    const container = document.getElementById('webgl-container');
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 2000);
+    camera.position.set(0, 0, 320);
+
+    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    // --- ライティング（3D感を強調する照明） ---
+    const ambientLight = new THREE.AmbientLight(0xdff0ff, 0.9);
+    scene.add(ambientLight);
+
+    const mainLight = new THREE.DirectionalLight(0xffffff, 1.8);
+    mainLight.position.set(100, 250, 200);
+    mainLight.castShadow = true;
+    mainLight.shadow.mapSize.width = 1024;
+    mainLight.shadow.mapSize.height = 1024;
+    scene.add(mainLight);
+
+    const pointLight = new THREE.PointLight(0x29b6f6, 1.5, 600);
+    pointLight.position.set(0, -100, 100);
+    scene.add(pointLight);
+
+    // --- 水底（砂地） ---
+    const seabedGeo = new THREE.PlaneGeometry(900, 400);
+    const seabedMat = new THREE.MeshStandardMaterial({ color: 0xffe082, roughness: 0.9 });
+    const seabed = new THREE.Mesh(seabedGeo, seabedMat);
+    seabed.rotation.x = -Math.PI / 3.2;
+    seabed.position.set(0, -140, -50);
+    seabed.receiveShadow = true;
+    scene.add(seabed);
+
+    // --- 泡パーティクル ---
+    const bubbles = [];
+    const bubbleGeo = new THREE.SphereGeometry(2, 12, 12);
+    const bubbleMat = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff, transparent: true, opacity: 0.6, roughness: 0.1, transmission: 0.9
+    });
+
+    for (let i = 0; i < 40; i++) {
+      const mesh = new THREE.Mesh(bubbleGeo, bubbleMat);
+      mesh.position.set((Math.random() - 0.5) * 400, (Math.random() - 0.5) * 300, (Math.random() - 0.5) * 150);
+      const scale = Math.random() * 1.5 + 0.5;
+      mesh.scale.set(scale, scale, scale);
+      mesh.userData = { speedY: Math.random() * 0.4 + 0.2 };
+      scene.add(mesh);
+      bubbles.push(mesh);
+    }
+
+    const active3DFishes = [];
+    const active3DFoods = [];
+
+    // ダブルクリックでフルスクリーン
+    document.body.addEventListener('dblclick', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    });
+
+    // 3D吹き出しエフェクト
+    function show3DEatEffect(position, text) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256; canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+      ctx.roundRect(10, 20, 236, 88, 30);
+      ctx.fill();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "#ff4081";
+      ctx.stroke();
+
+      ctx.font = "Bold 26px sans-serif";
+      ctx.fillStyle = "#ff4081";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, 128, 64);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const sprite = new THREE.Sprite(spriteMat);
+
+      sprite.position.copy(position);
+      sprite.position.y += 20;
+      sprite.scale.set(35, 17.5, 1);
+      scene.add(sprite);
+
+      const startTime = Date.now();
+      const interval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        sprite.position.y += 0.3;
+        sprite.material.opacity = 1 - (elapsed / 1400);
+
+        if (elapsed >= 1400) {
+          clearInterval(interval);
+          scene.remove(sprite);
+          sprite.material.dispose();
+          texture.dispose();
+        }
+      }, 30);
+    }
+
+    // 💡【合体現象解消】3Dアクリルフィギュア構造
+    function create3DFish(dataURL, type, callback) {
+      const loader = new THREE.TextureLoader();
+      loader.load(dataURL, (texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+
+        const img = texture.image;
+        const aspect = img.width / img.height;
+        const baseW = 60;
+        const baseH = baseW / aspect;
+
+        const group = new THREE.Group();
+        const planeGeo = new THREE.PlaneGeometry(baseW, baseH);
+
+        // 💡 alphaTest: 0.5 で透過部分の合体を完全に防止！
+        const frontMat = new THREE.MeshStandardMaterial({
+          map: texture,
+          transparent: true,
+          alphaTest: 0.5,
+          roughness: 0.3,
+          metalness: 0.1
+        });
+
+        const backMat = new THREE.MeshStandardMaterial({
+          map: texture,
+          transparent: true,
+          alphaTest: 0.5,
+          roughness: 0.3,
+          metalness: 0.1
+        });
+
+        // 表と裏のメッシュ（1.5pxの厚みを持たせる）
+        const frontMesh = new THREE.Mesh(planeGeo, frontMat);
+        frontMesh.position.z = 0.75;
+        frontMesh.castShadow = true;
+
+        const backMesh = new THREE.Mesh(planeGeo, backMat);
+        backMesh.position.z = -0.75;
+        backMesh.rotation.y = Math.PI;
+        backMesh.castShadow = true;
+
+        // 厚みを強調する側面の立体アクリルフレーム
+        const sideGeo = new THREE.BoxGeometry(baseW, baseH, 1.2);
+        const sideMat = new THREE.MeshPhysicalMaterial({
+          color: 0x80d8ff,
+          transparent: true,
+          opacity: 0.4,
+          roughness: 0.1,
+          transmission: 0.6
+        });
+        const sideMesh = new THREE.Mesh(sideGeo, sideMat);
+
+        group.add(frontMesh);
+        group.add(backMesh);
+        group.add(sideMesh);
+
+        callback(group);
+      });
+    }
+
+    // Firebase: 魚・お絵描きの受信
+    onChildAdded(ref(db, 'art_stream'), (snapshot) => {
+      const data = snapshot.val();
+      if (!data || !data.dataURL) return;
+
+      const now = Date.now();
+      const createdAt = data.createdAt || now;
+      const elapsedTime = now - createdAt;
+
+      if (elapsedTime >= MAX_LIFETIME) {
+        remove(snapshot.ref).catch(() => {});
+        return;
+      }
+
+      const remainingLife = MAX_LIFETIME - elapsedTime;
+      const type = data.type || 'fish';
+
+      create3DFish(data.dataURL, type, (fishGroup) => {
+        const startY = (type === 'crab') ? -110 : (Math.random() - 0.5) * 120;
+        fishGroup.position.set((Math.random() - 0.5) * 260, startY, (Math.random() - 0.5) * 60);
+
+        fishGroup.userData = {
+          type: type,
+          targetPos: fishGroup.position.clone(),
+          speed: type === 'crab' ? 0.6 : 0.9,
+          eatenCount: 0,
+          maxEatCount: 5,
+          isFull: false,
+          isLeaving: false,
+          targetFood: null,
+          dbRef: snapshot.ref,
+          baseScale: 1.0,
+          swimTimeOffset: Math.random() * 100,
+          currentAngleY: 0
+        };
+
+        scene.add(fishGroup);
+        active3DFishes.push(fishGroup);
+
+        setTimeout(() => {
+          fishGroup.userData.isLeaving = true;
+          if (snapshot.ref) remove(snapshot.ref).catch(() => {});
+        }, remainingLife);
+      });
+    });
+
+    // Firebase: エサの受信
+    onChildAdded(ref(db, 'feed_stream'), (snapshot) => {
+      if (processedFoodKeys.has(snapshot.key)) return;
+      processedFoodKeys.add(snapshot.key);
+
+      const data = snapshot.val();
+      if (!data || typeof data.createdAt !== 'number') {
+        remove(snapshot.ref).catch(() => {});
+        return;
+      }
+
+      const now = Date.now();
+      if (data.createdAt < pageStartTime - 1000 || (now - data.createdAt) > 10000) {
+        remove(snapshot.ref).catch(() => {});
+        return;
+      }
+
+      drop3DFood();
+      remove(snapshot.ref).catch(() => {});
+    });
+
+    function drop3DFood() {
+      const foodGeo = new THREE.SphereGeometry(6, 16, 16);
+      const foodMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.6 });
+      const foodMesh = new THREE.Mesh(foodGeo, foodMat);
+      foodMesh.castShadow = true;
+
+      const startX = (Math.random() - 0.5) * 240;
+      foodMesh.position.set(startX, 150, (Math.random() - 0.5) * 40);
+
+      foodMesh.userData = { isEaten: false, targetedBy: null, fallSpeed: 0.6 };
+
+      scene.add(foodMesh);
+      active3DFoods.push(foodMesh);
+    }
+
+    function remove3DFood(foodMesh) {
+      foodMesh.userData.isEaten = true;
+      const idx = active3DFoods.indexOf(foodMesh);
+      if (idx !== -1) active3DFoods.splice(idx, 1);
+      scene.remove(foodMesh);
+      foodMesh.geometry.dispose();
+      foodMesh.material.dispose();
+    }
+
+    // --- メインアニメーション ---
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      const time = clock.getElapsedTime();
+
+      // 1. 泡の浮上
+      bubbles.forEach(b => {
+        b.position.y += b.userData.speedY;
+        b.position.x += Math.sin(time + b.position.y) * 0.2;
+        if (b.position.y > 160) b.position.y = -150;
+      });
+
+      // 2. エサの落下
+      active3DFoods.forEach(food => {
+        if (food.userData.isEaten) return;
+        food.position.y -= food.userData.fallSpeed;
+        food.rotation.x += 0.02;
+        food.rotation.y += 0.02;
+
+        if (food.position.y < -120) remove3DFood(food);
+      });
+
+      // 3. 魚たちの3Dリアルスイミング
+      active3DFishes.forEach(fish => {
+        const data = fish.userData;
+
+        if (data.isLeaving) {
+          fish.position.y += 2.5;
+          fish.position.x += 1.5;
+          fish.rotation.y += 0.1;
+          fish.rotation.z += 0.1;
+          if (fish.position.y > 300) {
+            scene.remove(fish);
+            const idx = active3DFishes.indexOf(fish);
+            if (idx !== -1) active3DFishes.splice(idx, 1);
+          }
+          return;
+        }
+
+        // A. エサ探索
+        if (!data.targetFood && !data.isFull && active3DFoods.length > 0) {
+          let closestFood = null;
+          let minDist = Infinity;
+
+          active3DFoods.forEach(food => {
+            if (food.userData.isEaten) return;
+            if (food.userData.targetedBy && food.userData.targetedBy !== fish) return;
+
+            const dist = fish.position.distanceTo(food.position);
+            if (dist < minDist) {
+              minDist = dist;
+              closestFood = food;
+            }
+          });
+
+          if (closestFood) {
+            data.targetFood = closestFood;
+            closestFood.userData.targetedBy = fish;
+          }
+        }
+
+        // B. 目標位置の設定
+        if (data.targetFood) {
+          if (data.targetFood.userData.isEaten) {
+            data.targetFood = null;
+          } else {
+            data.targetPos.copy(data.targetFood.position);
+          }
+        } else if (Math.random() < 0.015) {
+          const targetY = (data.type === 'crab') ? -110 : (Math.random() - 0.5) * 200;
+          data.targetPos.set(
+            (Math.random() - 0.5) * 260,
+            targetY,
+            (Math.random() - 0.5) * 60
+          );
+        }
+
+        // C. 3D移動＆旋回
+        const dir = new THREE.Vector3().subVectors(data.targetPos, fish.position);
+        const dist = dir.length();
+
+        if (dist > 2) {
+          dir.normalize();
+          fish.position.addScaledVector(dir, data.speed * (data.targetFood ? 1.8 : 1.0));
+
+          const targetAngleY = dir.x > 0 ? 0 : Math.PI;
+          data.currentAngleY = THREE.MathUtils.lerp(data.currentAngleY, targetAngleY, 0.08);
+          fish.rotation.y = data.currentAngleY;
+
+          // 💡旋回時に体を斜めにひねる（3Dヒラヒラアクション）
+          const tiltZ = (dir.x > 0 ? 1 : -1) * dir.y * 0.4;
+          fish.rotation.z = THREE.MathUtils.lerp(fish.rotation.z, tiltZ, 0.1);
+        }
+
+        // D. 泳ぎのゆらぎ
+        if (data.type !== 'crab') {
+          fish.position.y += Math.sin(time * 2 + data.swimTimeOffset) * 0.12;
+          fish.rotation.x = Math.sin(time * 1.5 + data.swimTimeOffset) * 0.08;
+        }
+
+        // E. パクッと食べる判定
+        if (data.targetFood) {
+          const hitDist = fish.position.distanceTo(data.targetFood.position);
+          if (hitDist < 25) {
+            const eatenFood = data.targetFood;
+            data.targetFood = null;
+            remove3DFood(eatenFood);
+
+            data.eatenCount++;
+            data.baseScale += 0.12;
+            fish.scale.setScalar(data.baseScale);
+
+            if (data.eatenCount >= data.maxEatCount) {
+              data.isFull = true;
+              show3DEatEffect(fish.position, "🈵 おなかいっぱい！💤");
+            } else {
+              const msgs = ["❤️ ぱくっ！", "✨ モグモグ！", "😋 おいしい！", "🎵 もぐもぐ！"];
+              const msg = msgs[Math.floor(Math.random() * msgs.length)];
+              show3DEatEffect(fish.position, msg);
+            }
+          }
+        }
+      });
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
