@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>お絵描きスキャナー</title>
+  <title>お絵描きスキャナー - パーフェクト抽出版</title>
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -27,6 +27,7 @@
       flex-shrink: 0;
     }
 
+    /* レスポンシブ可変カメラ枠（ボタンが画面外に出ない） */
     .camera-container {
       position: relative; width: 92vw; max-width: 600px;
       flex: 1; margin: 8px 0;
@@ -103,7 +104,6 @@
       animation: pulse 1s infinite alternate;
     }
 
-    /* 💡フリーズ防止用の安全なメッセージ通知（トースト） */
     #toastNotice {
       display: none; position: fixed; top: 20%; left: 50%; transform: translate(-50%, -50%);
       background: rgba(230, 81, 0, 0.95); color: #fff; padding: 12px 24px;
@@ -150,7 +150,7 @@
 
   <div id="loadingOverlay">
     <div style="font-size: 3.5rem;">🔍</div>
-    <div class="spinner-text" id="loadingText">絵を探しているよ...</div>
+    <div class="spinner-text" id="loadingText">きれいに 切りぬいているよ...</div>
   </div>
 
   <div id="toastNotice"></div>
@@ -187,13 +187,10 @@
     
     let processedDataURL = null;
 
-    // トースト通知を表示する安全な関数
     function showToast(msg) {
       toastNotice.innerText = msg;
       toastNotice.style.display = 'block';
-      setTimeout(() => {
-        toastNotice.style.display = 'none';
-      }, 2500);
+      setTimeout(() => { toastNotice.style.display = 'none'; }, 2500);
     }
 
     async function initCamera() {
@@ -204,20 +201,19 @@
         });
         video.srcObject = stream;
       } catch (err) {
-        showToast("カメラをあくせすできませんでした");
+        showToast("カメラを起動できませんでした");
       }
     }
     initCamera();
 
     window.startCapture = function() {
       if (!video.videoWidth || !video.videoHeight) return;
-      loadingText.innerText = "🔍 絵を探しているよ...";
+      loadingText.innerText = "🔍 きれいに 切りぬいているよ...";
       loadingOverlay.style.display = 'flex';
       setTimeout(() => { processImage(); }, 50);
     };
 
     function processImage() {
-      // 💡フリーズ絶対防止：try...finally構造
       try {
         const containerRect = cameraContainer.getBoundingClientRect();
         const guideRect = guideFrame.getBoundingClientRect();
@@ -262,64 +258,42 @@
         const imgData = ctx.getImageData(0, 0, cropW, cropH);
         const data = imgData.data;
 
-        // 1. 背景紙の色サンプリング（四隅）
+        // 💡 1. 紙地（背景）サンプリング
         const cornerR = (data[0] + data[(cropW - 1) * 4] + data[(cropH - 1) * cropW * 4]) / 3;
         const cornerG = (data[1] + data[(cropW - 1) * 4 + 1] + data[(cropH - 1) * cropW * 4 + 1]) / 3;
         const cornerB = (data[2] + data[(cropW - 1) * 4 + 2] + data[(cropH - 1) * cropW * 4 + 2]) / 3;
 
-        const isPurePaper = (r, g, b) => {
+        // 線または色塗り部分（エッジ・色の存在）を厳密に検出する関数
+        const isContentPixel = (r, g, b) => {
+          const brightness = (r + g + b) / 3;
+          const colorDiff = Math.max(r, g, b) - Math.min(r, g, b);
           const diffR = Math.abs(r - cornerR);
           const diffG = Math.abs(g - cornerG);
           const diffB = Math.abs(b - cornerB);
-          const brightness = (r + g + b) / 3;
-          return (diffR < 22 && diffG < 22 && diffB < 22 && brightness > 150);
+
+          const isBlackLine = brightness < 110; // 黒線
+          const isColored = colorDiff > 12;      // 色鉛筆・クーピーの色
+          const isShaded = (diffR > 20 || diffG > 20 || diffB > 20); // 淡い影・色
+
+          return isBlackLine || isColored || isShaded;
         };
 
-        // 2. 背景（余白）の消去（Flood Fill）
-        const visited = new Uint8Array(cropW * cropH);
-        const queue = [0, cropW - 1, (cropH - 1) * cropW, cropW * cropH - 1];
-        queue.forEach(idx => visited[idx] = 1);
-
-        while (queue.length > 0) {
-          const curr = queue.pop();
-          const pIdx = curr * 4;
-
-          if (isPurePaper(data[pIdx], data[pIdx + 1], data[pIdx + 2])) {
-            data[pIdx + 3] = 0;
-
-            const x = curr % cropW;
-            const y = Math.floor(curr / cropW);
-
-            const neighbors = [];
-            if (x > 0) neighbors.push(curr - 1);
-            if (x < cropW - 1) neighbors.push(curr + 1);
-            if (y > 0) neighbors.push(curr - cropW);
-            if (y < cropH - 1) neighbors.push(curr + cropW);
-
-            for (const n of neighbors) {
-              if (!visited[n]) {
-                visited[n] = 1;
-                queue.push(n);
-              }
-            }
-          }
-        }
-
-        // 3. 描画領域（クラスタ）の解析
+        // 💡 2. 描画領域のクラスタ分解（「ぬりえの四角枠」と「生き物の絵」を自動選別）
         const visitedClusters = new Uint8Array(cropW * cropH);
         const clusters = [];
 
         for (let y = 0; y < cropH; y += 2) {
           for (let x = 0; x < cropW; x += 2) {
             const startIdx = y * cropW + x;
-            if (data[startIdx * 4 + 3] > 0 && !visitedClusters[startIdx]) {
+            const pIdx = startIdx * 4;
+
+            if (isContentPixel(data[pIdx], data[pIdx + 1], data[pIdx + 2]) && !visitedClusters[startIdx]) {
               const clusterPixels = [];
               const cQueue = [startIdx];
               visitedClusters[startIdx] = 1;
 
               let cMinX = x, cMaxX = x, cMinY = y, cMaxY = y;
               let touchesEdge = false;
-              let coloredPixelCount = 0;
 
               while (cQueue.length > 0) {
                 const curr = cQueue.pop();
@@ -327,14 +301,10 @@
                 const cx = curr % cropW;
                 const cy = Math.floor(curr / cropW);
 
+                // カメラ枠の端（外周）に触れているか判定
                 if (cx <= 4 || cx >= cropW - 5 || cy <= 4 || cy >= cropH - 5) {
                   touchesEdge = true;
                 }
-
-                const pIdx = curr * 4;
-                const r = data[pIdx], g = data[pIdx + 1], b = data[pIdx + 2];
-                const colorDiff = Math.max(r, g, b) - Math.min(r, g, b);
-                if (colorDiff > 14) coloredPixelCount++;
 
                 if (cx < cMinX) cMinX = cx; if (cx > cMaxX) cMaxX = cx;
                 if (cy < cMinY) cMinY = cy; if (cy > cMaxY) cMaxY = cy;
@@ -347,19 +317,21 @@
                 ];
 
                 for (const n of neighbors) {
-                  if (n >= 0 && data[n * 4 + 3] > 0 && !visitedClusters[n]) {
-                    visitedClusters[n] = 1;
-                    cQueue.push(n);
+                  if (n >= 0 && !visitedClusters[n]) {
+                    const npIdx = n * 4;
+                    if (isContentPixel(data[npIdx], data[npIdx + 1], data[npIdx + 2])) {
+                      visitedClusters[n] = 1;
+                      cQueue.push(n);
+                    }
                   }
                 }
               }
 
-              if (clusterPixels.length > 20) { // 極小ノイズは除去
+              if (clusterPixels.length > 15) {
                 clusters.push({
                   pixels: clusterPixels,
                   minX: cMinX, maxX: cMaxX, minY: cMinY, maxY: cMaxY,
                   touchesEdge,
-                  colorRatio: coloredPixelCount / clusterPixels.length,
                   pixelCount: clusterPixels.length
                 });
               }
@@ -367,14 +339,13 @@
           }
         }
 
-        // 💡生き物が全く見つからない場合の処理
         if (clusters.length === 0) {
           showToast("絵が見つからなかったよ！もう一度かざしてみてね");
           resetScan();
           return;
         }
 
-        // 4. メイン描画物のスコア判定（マイルド化）
+        // 💡 3. 「ぬりえの四角枠・はみ出し線」を除外＆「中央の生き物」を特定
         const centerX = cropW / 2;
         const centerY = cropH / 2;
 
@@ -382,32 +353,63 @@
           const cCenterX = (c.minX + c.maxX) / 2;
           const cCenterY = (c.minY + c.maxY) / 2;
           const distFromCenter = Math.hypot(cCenterX - centerX, cCenterY - centerY);
-          let edgePenalty = (c.touchesEdge && c.colorRatio < 0.2) ? 0.05 : 1.0;
-
-          c.score = (c.pixelCount * (1 + c.colorRatio * 3) * edgePenalty) / (distFromCenter + 50);
+          
+          // 画面端に接している巨大な線（ぬりえの四角枠）は除外ペナルティ
+          let edgePenalty = c.touchesEdge ? 0.01 : 1.0;
+          c.score = (c.pixelCount * edgePenalty) / (distFromCenter + 40);
         });
 
         clusters.sort((a, b) => b.score - a.score);
+        const mainCreature = clusters[0]; // 一番中心にあって枠でないものを「生き物」に認定
+
+        // 💡 4. 外郭バウンダリ（生き物の輪郭）を壁として指定
+        const wallMask = new Uint8Array(cropW * cropH);
         
-        // 💡一番スコアの高いものを「メインの絵」として採用
-        const mainCreature = clusters[0];
-        const mainBB = {
-          minX: mainCreature.minX, maxX: mainCreature.maxX,
-          minY: mainCreature.minY, maxY: mainCreature.maxY
-        };
-
-        const validPixelSet = new Set();
+        // 生き物本体（および近くの目・ヒレなどのパーツ）を壁に指定
         clusters.forEach(c => {
-          if (c.touchesEdge && c.colorRatio < 0.15 && c !== mainCreature) return; // 外枠黒線は弾く
+          if (c.touchesEdge && c !== mainCreature) return; // 外枠は無視して消去
 
-          const isNearMain = !(c.maxX < mainBB.minX - 60 || c.minX > mainBB.maxX + 60 ||
-                               c.maxY < mainBB.minY - 60 || c.minY > mainBB.maxY + 60);
+          const isNearMain = !(c.maxX < mainCreature.minX - 50 || c.minX > mainCreature.maxX + 50 ||
+                               c.maxY < mainCreature.minY - 50 || c.minY > mainCreature.maxY + 50);
 
           if (c === mainCreature || isNearMain) {
-            c.pixels.forEach(p => validPixelSet.add(p));
+            c.pixels.forEach(p => wallMask[p] = 1);
           }
         });
 
+        // 💡 5. 【極小バケツ塗り（Outer Flood Fill）】外側の紙だけを絶対透過
+        // 四隅からスタートして「生き物の輪郭（壁）」で浸食をストップさせる
+        const isOuterPaper = new Uint8Array(cropW * cropH);
+        const fillQueue = [0, cropW - 1, (cropH - 1) * cropW, cropW * cropH - 1];
+        fillQueue.forEach(idx => isOuterPaper[idx] = 1);
+
+        while (fillQueue.length > 0) {
+          const curr = fillQueue.pop();
+          const cx = curr % cropW;
+          const cy = Math.floor(curr / cropW);
+
+          const neighbors = [];
+          if (cx > 0) neighbors.push(curr - 1);
+          if (cx < cropW - 1) neighbors.push(curr + 1);
+          if (cy > 0) neighbors.push(curr - cropW);
+          if (cy < cropH - 1) neighbors.push(curr + cropW);
+
+          for (const n of neighbors) {
+            // 壁（生き物の輪郭）にぶつかったら塗り進めない！
+            if (!isOuterPaper[n] && wallMask[n] === 0) {
+              const npIdx = n * 4;
+              const r = data[npIdx], g = data[npIdx + 1], b = data[npIdx + 2];
+              
+              // 背景色と同等、または生き物の外側である限り広がる
+              if (!isContentPixel(r, g, b)) {
+                isOuterPaper[n] = 1;
+                fillQueue.push(n);
+              }
+            }
+          }
+        }
+
+        // 💡 6. ピクセル最終書き換え（外側＝透明 / 内側＝色鉛筆・白地も100%保持！）
         let minX = cropW, maxX = 0, minY = cropH, maxY = 0;
         let hasContent = false;
 
@@ -416,12 +418,16 @@
             const idx = y * cropW + x;
             const pIdx = idx * 4;
 
-            if (validPixelSet.has(idx)) {
+            if (isOuterPaper[idx] === 1) {
+              // 「外側の紙」領域だけを透過！
+              data[pIdx + 3] = 0;
+            } else {
+              // 「生き物の内側」領域は色鉛筆も塗り残した白地も100%完全保持！
+              data[pIdx + 3] = 255;
+
               if (x < minX) minX = x; if (x > maxX) maxX = x;
               if (y < minY) minY = y; if (y > maxY) maxY = y;
               hasContent = true;
-            } else {
-              data[pIdx + 3] = 0;
             }
           }
         }
@@ -432,7 +438,7 @@
           return;
         }
 
-        // 5. プレビュー生成
+        // 💡 7. トリミング＆高解像度プレビュー生成
         const pad = 10;
         minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
         maxX = Math.min(cropW, maxX + pad); maxY = Math.min(cropH, maxY + pad);
@@ -468,7 +474,6 @@
         showToast("うまく読み込めなかったよ！もう一度撮影してね");
         resetScan();
       } finally {
-        // 💡どんなエラーが起きても絶対にローディング画面を消して元に戻す！
         loadingOverlay.style.display = 'none';
       }
     }
