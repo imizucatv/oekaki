@@ -26,7 +26,6 @@
       z-index: 1;
     }
 
-    /* 水面の光の差し込み効果 */
     .sunbeams {
       position: absolute; top: 0; left: 0; width: 100%; height: 100%;
       background: repeating-linear-gradient(
@@ -69,7 +68,7 @@
     const pageStartTime = Date.now();
     const MAX_LIFETIME = 120000;
 
-    // --- Three.js 基本セットアップ ---
+    // --- Three.js 基本環境 ---
     const container = document.getElementById('webgl-container');
     const scene = new THREE.Scene();
 
@@ -83,54 +82,40 @@
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
 
-    // --- ライティング（水中のライティング） ---
+    // --- ライティング（立体感を生む3D照明） ---
     const ambientLight = new THREE.AmbientLight(0xdff0ff, 0.9);
     scene.add(ambientLight);
 
-    const mainLight = new THREE.DirectionalLight(0xffffff, 1.5);
-    mainLight.position.set(80, 250, 200);
+    const mainLight = new THREE.DirectionalLight(0xffffff, 1.8);
+    mainLight.position.set(100, 250, 200);
     mainLight.castShadow = true;
     mainLight.shadow.mapSize.width = 1024;
     mainLight.shadow.mapSize.height = 1024;
     scene.add(mainLight);
 
-    const pointLight = new THREE.PointLight(0x29b6f6, 1.2, 500);
+    const pointLight = new THREE.PointLight(0x29b6f6, 1.5, 600);
     pointLight.position.set(0, -100, 100);
     scene.add(pointLight);
 
-    // --- 水底（砂地）の3D作成 ---
-    const seabedGeo = new THREE.PlaneGeometry(800, 300, 32, 32);
-    const seabedMat = new THREE.MeshStandardMaterial({
-      color: 0xffe082,
-      roughness: 0.9,
-      metalness: 0.1
-    });
+    // --- 水底（砂地） ---
+    const seabedGeo = new THREE.PlaneGeometry(900, 400);
+    const seabedMat = new THREE.MeshStandardMaterial({ color: 0xffe082, roughness: 0.9 });
     const seabed = new THREE.Mesh(seabedGeo, seabedMat);
-    seabed.rotation.x = -Math.PI / 3.5;
+    seabed.rotation.x = -Math.PI / 3.2;
     seabed.position.set(0, -140, -50);
     seabed.receiveShadow = true;
     scene.add(seabed);
 
-    // --- 泡（Bubbles）パーティクル ---
-    const bubbleCount = 40;
+    // --- 泡パーティクル ---
+    const bubbles = [];
     const bubbleGeo = new THREE.SphereGeometry(2, 12, 12);
     const bubbleMat = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.6,
-      roughness: 0.1,
-      transmission: 0.9,
-      thickness: 1
+      color: 0xffffff, transparent: true, opacity: 0.6, roughness: 0.1, transmission: 0.9
     });
 
-    const bubbles = [];
-    for (let i = 0; i < bubbleCount; i++) {
+    for (let i = 0; i < 40; i++) {
       const mesh = new THREE.Mesh(bubbleGeo, bubbleMat);
-      mesh.position.set(
-        (Math.random() - 0.5) * 400,
-        (Math.random() - 0.5) * 300,
-        (Math.random() - 0.5) * 150
-      );
+      mesh.position.set((Math.random() - 0.5) * 400, (Math.random() - 0.5) * 300, (Math.random() - 0.5) * 150);
       const scale = Math.random() * 1.5 + 0.5;
       mesh.scale.set(scale, scale, scale);
       mesh.userData = { speedY: Math.random() * 0.4 + 0.2 };
@@ -138,11 +123,10 @@
       bubbles.push(mesh);
     }
 
-    // --- 配列管理 ---
     const active3DFishes = [];
     const active3DFoods = [];
 
-    // --- ダブルクリックでフルスクリーン切り替え ---
+    // フルスクリーン切り替え
     document.body.addEventListener('dblclick', () => {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(() => {});
@@ -151,7 +135,7 @@
       }
     });
 
-    // --- 3D吹き出し（「ぱくっ！」メッセージ）生成 ---
+    // 3D吹き出しエフェクト
     function show3DEatEffect(position, text) {
       const canvas = document.createElement('canvas');
       canvas.width = 256; canvas.height = 128;
@@ -194,65 +178,63 @@
       }, 30);
     }
 
-    // --- 2Dイラストから「厚みのある3Dモデル（Extrude）」を作成 ---
+    // 💡【新・3D生き物生成アルゴリズム】イラストの形そのままに立体フィギュア化！
     function create3DFish(dataURL, type, callback) {
-      const img = new Image();
-      img.crossOrigin = "Anonymous";
-      img.src = dataURL;
+      const loader = new THREE.TextureLoader();
+      loader.load(dataURL, (texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
 
-      img.onload = () => {
+        const img = texture.image;
         const aspect = img.width / img.height;
         const baseW = 60;
         const baseH = baseW / aspect;
 
-        // 立体化（押し出しパス）の作成
-        const shape = new THREE.Shape();
-        shape.moveTo(-baseW / 2, -baseH / 2);
-        shape.lineTo(baseW / 2, -baseH / 2);
-        shape.lineTo(baseW / 2, baseH / 2);
-        shape.lineTo(-baseW / 2, baseH / 2);
-        shape.closePath();
+        // グループ構造（立体フィギュアの骨組み）
+        const group = new THREE.Group();
 
-        const extrudeSettings = {
-          depth: 10,           // 厚み
-          bevelEnabled: true,  // 角を丸める
-          bevelSegments: 4,
-          steps: 1,
-          bevelSize: 2,
-          bevelThickness: 2
-        };
-
-        const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-        geometry.center();
-
-        const texture = new THREE.Texture(img);
-        texture.needsUpdate = true;
-        texture.colorSpace = THREE.SRGBColorSpace;
-
-        // 前面・背面に描いたイラスト、側面に鮮やかな水色マテリアルを配置
-        const frontMaterial = new THREE.MeshStandardMaterial({
+        const planeGeo = new THREE.PlaneGeometry(baseW, baseH);
+        
+        // 透過PNGのアルファ値をそのまま反映（透明な余白を消し去る）
+        const mat = new THREE.MeshStandardMaterial({
           map: texture,
           transparent: true,
-          alphaTest: 0.1,
-          roughness: 0.3,
+          alphaTest: 0.08,
+          side: THREE.DoubleSide,
+          roughness: 0.4,
           metalness: 0.1
         });
 
-        const sideMaterial = new THREE.MeshStandardMaterial({
-          color: 0x29b6f6,
-          roughness: 0.4,
-          metalness: 0.2
+        // 表面と裏面を少しだけ離して「厚み」を作成
+        const frontMesh = new THREE.Mesh(planeGeo, mat);
+        frontMesh.position.z = 2.5;
+        frontMesh.castShadow = true;
+
+        const backMesh = new THREE.Mesh(planeGeo, mat);
+        backMesh.position.z = -2.5;
+        backMesh.rotation.y = Math.PI;
+        backMesh.castShadow = true;
+
+        // 中間に厚み（ボディ感）を出すための側面レイヤー
+        const innerGeo = new THREE.PlaneGeometry(baseW * 0.96, baseH * 0.96);
+        const innerMat = new THREE.MeshStandardMaterial({
+          map: texture,
+          transparent: true,
+          alphaTest: 0.1,
+          side: THREE.DoubleSide,
+          color: 0x80d8ff
         });
+        const innerMesh = new THREE.Mesh(innerGeo, innerMat);
+        innerMesh.position.z = 0;
 
-        const mesh = new THREE.Mesh(geometry, [frontMaterial, sideMaterial]);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
+        group.add(frontMesh);
+        group.add(backMesh);
+        group.add(innerMesh);
 
-        callback(mesh);
-      };
+        callback(group);
+      });
     }
 
-    // --- Firebase: 魚の受信処理 ---
+    // Firebase: 魚・お絵描きの受信
     onChildAdded(ref(db, 'art_stream'), (snapshot) => {
       const data = snapshot.val();
       if (!data || !data.dataURL) return;
@@ -269,13 +251,13 @@
       const remainingLife = MAX_LIFETIME - elapsedTime;
       const type = data.type || 'fish';
 
-      create3DFish(data.dataURL, type, (fishMesh) => {
+      create3DFish(data.dataURL, type, (fishGroup) => {
         const startY = (type === 'crab') ? -110 : (Math.random() - 0.5) * 120;
-        fishMesh.position.set((Math.random() - 0.5) * 260, startY, (Math.random() - 0.5) * 60);
+        fishGroup.position.set((Math.random() - 0.5) * 260, startY, (Math.random() - 0.5) * 60);
 
-        fishMesh.userData = {
+        fishGroup.userData = {
           type: type,
-          targetPos: fishMesh.position.clone(),
+          targetPos: fishGroup.position.clone(),
           speed: type === 'crab' ? 0.6 : 0.9,
           eatenCount: 0,
           maxEatCount: 5,
@@ -284,21 +266,21 @@
           targetFood: null,
           dbRef: snapshot.ref,
           baseScale: 1.0,
-          swimTimeOffset: Math.random() * 100
+          swimTimeOffset: Math.random() * 100,
+          currentAngleY: 0
         };
 
-        scene.add(fishMesh);
-        active3DFishes.push(fishMesh);
+        scene.add(fishGroup);
+        active3DFishes.push(fishGroup);
 
-        // 寿命が来たら飛んで消えるアニメーション
         setTimeout(() => {
-          fishMesh.userData.isLeaving = true;
+          fishGroup.userData.isLeaving = true;
           if (snapshot.ref) remove(snapshot.ref).catch(() => {});
         }, remainingLife);
       });
     });
 
-    // --- Firebase: エサの受信処理（重複ストッパー付き） ---
+    // Firebase: エサの受信
     onChildAdded(ref(db, 'feed_stream'), (snapshot) => {
       if (processedFoodKeys.has(snapshot.key)) return;
       processedFoodKeys.add(snapshot.key);
@@ -319,26 +301,16 @@
       remove(snapshot.ref).catch(() => {});
     });
 
-    // --- 3Dエサの落下 ---
     function drop3DFood() {
       const foodGeo = new THREE.SphereGeometry(6, 16, 16);
-      const foodMat = new THREE.MeshStandardMaterial({
-        color: 0x8d6e63,
-        roughness: 0.6,
-        metalness: 0.1
-      });
-
+      const foodMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.6 });
       const foodMesh = new THREE.Mesh(foodGeo, foodMat);
       foodMesh.castShadow = true;
 
       const startX = (Math.random() - 0.5) * 240;
       foodMesh.position.set(startX, 150, (Math.random() - 0.5) * 40);
 
-      foodMesh.userData = {
-        isEaten: false,
-        targetedBy: null,
-        fallSpeed: 0.6
-      };
+      foodMesh.userData = { isEaten: false, targetedBy: null, fallSpeed: 0.6 };
 
       scene.add(foodMesh);
       active3DFoods.push(foodMesh);
@@ -353,7 +325,7 @@
       foodMesh.material.dispose();
     }
 
-    // --- メインアニメーションループ（AI＆移動制御） ---
+    // --- メインアニメーション（3Dスイミング＆AI） ---
     const clock = new THREE.Clock();
 
     function animate() {
@@ -361,30 +333,28 @@
       const delta = clock.getDelta();
       const time = clock.getElapsedTime();
 
-      // 1. 泡の上下運動
+      // 1. 泡の浮上
       bubbles.forEach(b => {
         b.position.y += b.userData.speedY;
         b.position.x += Math.sin(time + b.position.y) * 0.2;
         if (b.position.y > 160) b.position.y = -150;
       });
 
-      // 2. 3Dエサの落下制御
+      // 2. エサの落下
       active3DFoods.forEach(food => {
         if (food.userData.isEaten) return;
         food.position.y -= food.userData.fallSpeed;
         food.rotation.x += 0.02;
         food.rotation.y += 0.02;
 
-        if (food.position.y < -120) {
-          remove3DFood(food);
-        }
+        if (food.position.y < -120) remove3DFood(food);
       });
 
-      // 3. 3D魚たちのAI＆リアルスイミング処理
+      // 3. 魚たちの3Dリアルスイミング
       active3DFishes.forEach(fish => {
         const data = fish.userData;
 
-        // 退出アニメーション（くるくる回りながら空へ）
+        // 退出アニメーション（回転しながら空へ）
         if (data.isLeaving) {
           fish.position.y += 2.5;
           fish.position.x += 1.5;
@@ -398,7 +368,7 @@
           return;
         }
 
-        // A. エサのターゲット探索
+        // A. エサ探索
         if (!data.targetFood && !data.isFull && active3DFoods.length > 0) {
           let closestFood = null;
           let minDist = Infinity;
@@ -420,14 +390,14 @@
           }
         }
 
-        // B. 目標位置の更新
+        // B. 目標地点の設定
         if (data.targetFood) {
           if (data.targetFood.userData.isEaten) {
             data.targetFood = null;
           } else {
             data.targetPos.copy(data.targetFood.position);
           }
-        } else if (Math.random() < 0.015) { // ランダム回遊
+        } else if (Math.random() < 0.015) {
           const targetY = (data.type === 'crab') ? -110 : (Math.random() - 0.5) * 200;
           data.targetPos.set(
             (Math.random() - 0.5) * 260,
@@ -436,7 +406,7 @@
           );
         }
 
-        // C. 目標地点へ移動
+        // C. 3D移動＆旋回アクション（一目で3Dだとわかるダイナミック動作）
         const dir = new THREE.Vector3().subVectors(data.targetPos, fish.position);
         const dist = dir.length();
 
@@ -444,18 +414,23 @@
           dir.normalize();
           fish.position.addScaledVector(dir, data.speed * (data.targetFood ? 1.8 : 1.0));
 
-          // 魚の進行方向（Y軸回転）の制御
+          // 進行方向に向かって3D旋回
           const targetAngleY = dir.x > 0 ? 0 : Math.PI;
-          fish.rotation.y = THREE.MathUtils.lerp(fish.rotation.y, targetAngleY, 0.1);
+          data.currentAngleY = THREE.MathUtils.lerp(data.currentAngleY, targetAngleY, 0.08);
+          fish.rotation.y = data.currentAngleY;
+
+          // 💡旋回時に体を斜めにひねる（3D感バツグンのヒラヒラモーション）
+          const tiltZ = (dir.x > 0 ? 1 : -1) * dir.y * 0.4;
+          fish.rotation.z = THREE.MathUtils.lerp(fish.rotation.z, tiltZ, 0.1);
         }
 
-        // D. 泳ぎのゆらぎ（Z軸の波打ちアニメーション）
+        // D. 泳ぎのゆらぎ
         if (data.type !== 'crab') {
-          fish.rotation.z = Math.sin(time * 3 + data.swimTimeOffset) * 0.12;
-          fish.position.y += Math.sin(time * 2 + data.swimTimeOffset) * 0.1;
+          fish.position.y += Math.sin(time * 2 + data.swimTimeOffset) * 0.12;
+          fish.rotation.x = Math.sin(time * 1.5 + data.swimTimeOffset) * 0.08;
         }
 
-        // E. エサへのヒット（パクッと食べる判定）
+        // E. パクッと食べる判定
         if (data.targetFood) {
           const hitDist = fish.position.distanceTo(data.targetFood.position);
           if (hitDist < 25) {
@@ -484,7 +459,6 @@
 
     animate();
 
-    // --- ウィンドウリサイズ対応 ---
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
