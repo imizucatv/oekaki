@@ -2,50 +2,154 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>みんなの水族館 - Real 3D Mesh Edition</title>
+  <title>みんなの水族館 - Exclusive Lock AI Edition</title>
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="みんなの水族館">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#e1f5fe">
 
   <style>
     html, body { 
       margin: 0; padding: 0;
       overflow: hidden; 
-      width: 100vw; height: 100vh; height: 100dvh;
-      background: linear-gradient(180deg, #0288d1 0%, #01579b 55%, #002f6c 100%);
+      height: 100vh; height: 100dvh; width: 100vw;
+      background: linear-gradient(180deg, #e1f5fe 0%, #b3e5fc 50%, #4fc3f7 100%);
       position: relative; font-family: sans-serif;
       overscroll-behavior: none; user-select: none;
-    }
-
-    #webgl-container {
-      position: absolute; top: 0; left: 0;
-      width: 100%; height: 100%;
-      z-index: 1;
     }
 
     .sunbeams {
       position: absolute; top: 0; left: 0; width: 100%; height: 100%;
       background: repeating-linear-gradient(
         110deg,
-        rgba(255, 255, 255, 0.15) 0px,
-        rgba(255, 255, 255, 0.15) 40px,
+        rgba(255, 255, 255, 0.25) 0px,
+        rgba(255, 255, 255, 0.25) 40px,
         transparent 40px,
-        transparent 110px
+        transparent 100px
       );
-      pointer-events: none; z-index: 2;
+      pointer-events: none;
+    }
+
+    .bubble {
+      position: absolute; bottom: -50px;
+      background: rgba(255, 255, 255, 0.4);
+      border: 2px solid rgba(255, 255, 255, 0.8);
+      border-radius: 50%;
+      animation: floatUp linear infinite;
+      pointer-events: none;
+    }
+
+    @keyframes floatUp {
+      0% { transform: translateY(0) scale(0.8); opacity: 0.8; }
+      50% { transform: translateY(-50vh) scale(1.1); }
+      100% { transform: translateY(-105vh) scale(1); opacity: 0; }
+    }
+
+    .seabed-container {
+      position: absolute; bottom: 0; width: 100%; height: 160px;
+      pointer-events: none; z-index: 1;
+    }
+
+    .art-item {
+      position: absolute; z-index: 10; pointer-events: none;
+      will-change: left, top;
+    }
+
+    .art-scaler {
+      display: inline-block;
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      transform-origin: center center;
+    }
+    
+    .art-body {
+      max-width: 240px; max-height: 240px;
+      filter: drop-shadow(0px 8px 12px rgba(0,0,0,0.2));
+      transition: opacity 3s ease-in;
+      transform-origin: center center;
+    }
+
+    .fish-wiggle { animation: swimWiggle 2.5s ease-in-out infinite alternate; }
+    @keyframes swimWiggle {
+      0% { transform: translateY(0px) rotate(-2deg); }
+      50% { transform: translateY(-10px) rotate(3deg); }
+      100% { transform: translateY(5px) rotate(-1deg); }
+    }
+
+    .crab-wiggle { animation: crabWalk 0.4s ease-in-out infinite alternate; }
+    @keyframes crabWalk {
+      0% { transform: translateY(0px) rotate(-3deg); }
+      100% { transform: translateY(-6px) rotate(3deg); }
+    }
+
+    .octopus-wiggle { animation: octopusFloat 3s ease-in-out infinite alternate; }
+    @keyframes octopusFloat {
+      0% { transform: translateY(0px) scaleY(1); }
+      50% { transform: translateY(-18px) scaleY(1.08) scaleX(0.95); }
+      100% { transform: translateY(6px) scaleY(0.95) scaleX(1.05); }
+    }
+    
+    .fly-away .art-body {
+      opacity: 0; transform: scale(0.01) rotate(1080deg) !important;
+    }
+
+    .food-item {
+      position: absolute;
+      width: 26px; height: 26px;
+      background: #8d6e63;
+      border: 3px solid #5d4037;
+      border-radius: 50%;
+      z-index: 15;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+      transition: top 8s linear, opacity 0.4s;
+    }
+
+    .eat-effect {
+      position: absolute;
+      font-size: 1.4rem;
+      font-weight: bold;
+      color: #ff4081;
+      background: rgba(255, 255, 255, 0.92);
+      padding: 4px 12px;
+      border-radius: 20px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      pointer-events: none;
+      z-index: 20;
+      white-space: nowrap;
+      animation: popAndFloat 1.4s ease-out forwards;
+    }
+
+    @keyframes popAndFloat {
+      0% { transform: translate(-50%, 0) scale(0.4); opacity: 0; }
+      20% { transform: translate(-50%, -15px) scale(1.2); opacity: 1; }
+      70% { transform: translate(-50%, -30px) scale(1); opacity: 1; }
+      100% { transform: translate(-50%, -45px) scale(0.8); opacity: 0; }
     }
   </style>
 </head>
 <body>
 
   <div class="sunbeams"></div>
-  <div id="webgl-container"></div>
+  <div id="bubbles-container"></div>
+
+  <div class="seabed-container">
+    <svg viewBox="0 0 1200 160" preserveAspectRatio="none" style="width: 100%; height: 100%;">
+      <path d="M0,160 L0,120 Q200,90 400,110 T800,100 T1200,110 L1200,160 Z" fill="#ffe082"/>
+      <path d="M150,130 Q140,90 155,80 Q165,70 170,85 Q180,65 195,75 Q205,85 195,100 Q210,110 200,130 Z" fill="#ff80ab"/>
+      <circle cx="155" cy="80" r="8" fill="#ff80ab"/>
+      <circle cx="170" cy="85" r="9" fill="#ff80ab"/>
+      <circle cx="195" cy="75" r="8" fill="#ff80ab"/>
+      <path d="M80,140 Q60,90 85,40 Q75,90 95,140" stroke="#66bb6a" stroke-width="12" stroke-linecap="round" fill="none"/>
+      <path d="M100,140 Q120,80 95,30 Q110,80 110,140" stroke="#81c784" stroke-width="10" stroke-linecap="round" fill="none"/>
+      <path d="M1000,135 Q980,100 990,85 Q1005,75 1010,95 Q1025,80 1035,90 Q1040,105 1030,135 Z" fill="#ffb74d"/>
+      <path d="M1080,140 Q1100,80 1070,30 Q1090,80 1095,140" stroke="#4caf50" stroke-width="12" stroke-linecap="round" fill="none"/>
+      <path d="M1060,140 Q1040,90 1055,50 Q1050,90 1070,140" stroke="#81c784" stroke-width="8" stroke-linecap="round" fill="none"/>
+      <polygon points="500,135 505,145 515,145 507,152 510,160 500,155 490,160 493,152 485,145 495,145" fill="#ff7043"/>
+    </svg>
+  </div>
 
   <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, onChildAdded, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
@@ -63,182 +167,37 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
+    const activeCreatures = [];
+    const activeFoods = [];
+
+    // ★ 重複発火ガード用変数
     const processedFoodKeys = new Set();
     const pageStartTime = Date.now();
-    const MAX_LIFETIME = 120000;
-
-    const container = document.getElementById('webgl-container');
-    const scene = new THREE.Scene();
-
-    // 💡立体感が伝わるようにカメラを少し斜め上に配置
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 2000);
-    camera.position.set(0, 20, 340);
-
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    container.appendChild(renderer.domElement);
-
-    // 💡立体感（凹凸の陰影）を強調する3Dライティング
-    const ambientLight = new THREE.AmbientLight(0xdff0ff, 0.7);
-    scene.add(ambientLight);
-
-    const mainLight = new THREE.DirectionalLight(0xffffff, 2.2);
-    mainLight.position.set(120, 220, 180);
-    mainLight.castShadow = true;
-    mainLight.shadow.mapSize.width = 1024;
-    mainLight.shadow.mapSize.height = 1024;
-    scene.add(mainLight);
-
-    const fillLight = new THREE.DirectionalLight(0x29b6f6, 1.0);
-    fillLight.position.set(-100, -100, 100);
-    scene.add(fillLight);
-
-    // 砂地
-    const seabedGeo = new THREE.PlaneGeometry(900, 400);
-    const seabedMat = new THREE.MeshStandardMaterial({ color: 0xffe082, roughness: 0.9 });
-    const seabed = new THREE.Mesh(seabedGeo, seabedMat);
-    seabed.rotation.x = -Math.PI / 2.8;
-    seabed.position.set(0, -130, -50);
-    seabed.receiveShadow = true;
-    scene.add(seabed);
-
-    // 泡
-    const bubbles = [];
-    const bubbleGeo = new THREE.SphereGeometry(2, 12, 12);
-    const bubbleMat = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff, transparent: true, opacity: 0.6, roughness: 0.1, transmission: 0.9
-    });
-
-    for (let i = 0; i < 35; i++) {
-      const mesh = new THREE.Mesh(bubbleGeo, bubbleMat);
-      mesh.position.set((Math.random() - 0.5) * 400, (Math.random() - 0.5) * 300, (Math.random() - 0.5) * 150);
-      const scale = Math.random() * 1.5 + 0.5;
-      mesh.scale.set(scale, scale, scale);
-      mesh.userData = { speedY: Math.random() * 0.4 + 0.2 };
-      scene.add(mesh);
-      bubbles.push(mesh);
-    }
-
-    const active3DFishes = [];
-    const active3DFoods = [];
 
     document.body.addEventListener('dblclick', () => {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(() => {});
-      } else if (document.exitFullscreen) {
-        document.exitFullscreen();
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
       }
     });
 
-    function show3DEatEffect(position, text) {
-      const canvas = document.createElement('canvas');
-      canvas.width = 256; canvas.height = 128;
-      const ctx = canvas.getContext('2d');
-
-      ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
-      ctx.roundRect(10, 20, 236, 88, 30);
-      ctx.fill();
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = "#ff4081";
-      ctx.stroke();
-
-      ctx.font = "Bold 26px sans-serif";
-      ctx.fillStyle = "#ff4081";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(text, 128, 64);
-
-      const texture = new THREE.CanvasTexture(canvas);
-      const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
-      const sprite = new THREE.Sprite(spriteMat);
-
-      sprite.position.copy(position);
-      sprite.position.y += 20;
-      sprite.scale.set(35, 17.5, 1);
-      scene.add(sprite);
-
-      const startTime = Date.now();
-      const interval = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        sprite.position.y += 0.3;
-        sprite.material.opacity = 1 - (elapsed / 1400);
-
-        if (elapsed >= 1400) {
-          clearInterval(interval);
-          scene.remove(sprite);
-          sprite.material.dispose();
-          texture.dispose();
-        }
-      }, 30);
+    const bubblesContainer = document.getElementById('bubbles-container');
+    function createBubble() {
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      const size = Math.random() * 20 + 10;
+      bubble.style.width = `${size}px`;
+      bubble.style.height = `${size}px`;
+      bubble.style.left = `${Math.random() * 100}vw`;
+      bubble.style.animationDuration = `${Math.random() * 5 + 5}s`;
+      bubblesContainer.appendChild(bubble);
+      setTimeout(() => bubble.remove(), 10000);
     }
+    setInterval(createBubble, 800);
 
-    // 💡【真・3D膨らましアルゴリズム】平らな絵の頂点を手前に押し出して「粘土フィギュア化」する！
-    function create3DFish(dataURL, type, callback) {
-      const loader = new THREE.TextureLoader();
-      loader.load(dataURL, (texture) => {
-        texture.colorSpace = THREE.SRGBColorSpace;
+    const MAX_LIFETIME = 120000;
 
-        const img = texture.image;
-        const aspect = img.width / img.height;
-        const width = 64;
-        const height = width / aspect;
-
-        // 1. 細かな3Dメッシュ（ポリゴン網）を作成 (32x32分割)
-        const segs = 32;
-        const geometry = new THREE.PlaneGeometry(width, height, segs, segs);
-
-        // 2. 画像のアルファチャンネル（塗りの深さ）を解析
-        const canvas = document.createElement('canvas');
-        canvas.width = segs + 1;
-        canvas.height = segs + 1;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, segs + 1, segs + 1);
-        const imgData = ctx.getImageData(0, 0, segs + 1, segs + 1).data;
-
-        // 3. 各ポリゴン頂点のZ座標（高さ）を変形させて「ぷっくり」膨らませる
-        const pos = geometry.attributes.position;
-        for (let y = 0; y <= segs; y++) {
-          for (let x = 0; x <= segs; x++) {
-            const idx = (y * (segs + 1) + x);
-            const alpha = imgData[idx * 4 + 3]; // 透明度
-
-            if (alpha > 30) {
-              // 端っこ（輪郭）は低く、中心に近いほど手前（Z軸）へ丸く膨らませる！
-              const nx = (x / segs) - 0.5;
-              const ny = (y / segs) - 0.5;
-              const centerDist = Math.cos(nx * Math.PI) * Math.cos(ny * Math.PI);
-              
-              // 手前に12px押し出す
-              pos.setZ(idx, Math.pow(centerDist, 0.7) * 14 * (alpha / 255));
-            } else {
-              pos.setZ(idx, 0);
-            }
-          }
-        }
-        geometry.computeVertexNormals(); // 陰影計算を更新
-
-        // 4. マテリアル設定（ツヤと立体感のある質感）
-        const material = new THREE.MeshStandardMaterial({
-          map: texture,
-          transparent: true,
-          alphaTest: 0.1,
-          side: THREE.DoubleSide,
-          roughness: 0.25,
-          metalness: 0.1
-        });
-
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-
-        callback(mesh);
-      });
-    }
-
-    // Firebase: 受信処理
     onChildAdded(ref(db, 'art_stream'), (snapshot) => {
       const data = snapshot.val();
       if (!data || !data.dataURL) return;
@@ -249,215 +208,384 @@
 
       if (elapsedTime >= MAX_LIFETIME) {
         remove(snapshot.ref).catch(() => {});
-        return;
+      } else {
+        const remainingLife = MAX_LIFETIME - elapsedTime;
+        createFloatingArt(data.dataURL, data.type || 'fish', snapshot.ref, remainingLife);
       }
-
-      const remainingLife = MAX_LIFETIME - elapsedTime;
-      const type = data.type || 'fish';
-
-      create3DFish(data.dataURL, type, (fishMesh) => {
-        const startY = (type === 'crab') ? -100 : (Math.random() - 0.5) * 120;
-        fishMesh.position.set((Math.random() - 0.5) * 240, startY, (Math.random() - 0.5) * 60);
-
-        fishMesh.userData = {
-          type: type,
-          targetPos: fishMesh.position.clone(),
-          speed: type === 'crab' ? 0.6 : 0.9,
-          eatenCount: 0,
-          maxEatCount: 5,
-          isFull: false,
-          isLeaving: false,
-          targetFood: null,
-          dbRef: snapshot.ref,
-          baseScale: 1.0,
-          swimTimeOffset: Math.random() * 100,
-          currentAngleY: 0
-        };
-
-        scene.add(fishMesh);
-        active3DFishes.push(fishMesh);
-
-        setTimeout(() => {
-          fishMesh.userData.isLeaving = true;
-          if (snapshot.ref) remove(snapshot.ref).catch(() => {});
-        }, remainingLife);
-      });
     });
 
-    // Firebase: エサ受信
+    // ★ エサ受信処理（重複処理の修正箇所）
     onChildAdded(ref(db, 'feed_stream'), (snapshot) => {
+      // 画面上で処理済みのIDは二度と落とさない
       if (processedFoodKeys.has(snapshot.key)) return;
       processedFoodKeys.add(snapshot.key);
 
       const data = snapshot.val();
+
       if (!data || typeof data.createdAt !== 'number') {
         remove(snapshot.ref).catch(() => {});
         return;
       }
 
       const now = Date.now();
-      if (data.createdAt < pageStartTime - 1000 || (now - data.createdAt) > 10000) {
+      const createdAt = data.createdAt;
+
+      if (createdAt < pageStartTime - 1000 || (now - createdAt) > 10000) {
         remove(snapshot.ref).catch(() => {});
         return;
       }
 
-      drop3DFood();
+      dropFood();
       remove(snapshot.ref).catch(() => {});
     });
 
-    function drop3DFood() {
-      const foodGeo = new THREE.SphereGeometry(6, 16, 16);
-      const foodMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63, roughness: 0.5 });
-      const foodMesh = new THREE.Mesh(foodGeo, foodMat);
-      foodMesh.castShadow = true;
+    function dropFood() {
+      const food = document.createElement('div');
+      food.className = 'food-item';
+      
+      const margin = Math.min(180, Math.max(100, window.innerWidth * 0.15));
+      const startX = Math.random() * (window.innerWidth - margin * 2) + margin;
+      const startY = -30;
+      const targetY = window.innerHeight - 60;
+      const fallDuration = 8000;
+      const startTime = Date.now();
 
-      const startX = (Math.random() - 0.5) * 220;
-      foodMesh.position.set(startX, 150, (Math.random() - 0.5) * 40);
+      food.style.left = `${startX}px`;
+      food.style.top = `${startY}px`;
+      document.body.appendChild(food);
 
-      foodMesh.userData = { isEaten: false, targetedBy: null, fallSpeed: 0.6 };
+      setTimeout(() => { food.style.top = `${targetY}px`; }, 50);
 
-      scene.add(foodMesh);
-      active3DFoods.push(foodMesh);
-    }
+      const foodObj = {
+        element: food,
+        x: startX + 13,
+        y: startY + 13,
+        isEaten: false,
+        targetedBy: null,
+        id: Date.now() + Math.random()
+      };
+      activeFoods.push(foodObj);
 
-    function remove3DFood(foodMesh) {
-      foodMesh.userData.isEaten = true;
-      const idx = active3DFoods.indexOf(foodMesh);
-      if (idx !== -1) active3DFoods.splice(idx, 1);
-      scene.remove(foodMesh);
-      foodMesh.geometry.dispose();
-      foodMesh.material.dispose();
-    }
-
-    // --- メインアニメーション ---
-    const clock = new THREE.Clock();
-
-    function animate() {
-      requestAnimationFrame(animate);
-      const time = clock.getElapsedTime();
-
-      // 泡
-      bubbles.forEach(b => {
-        b.position.y += b.userData.speedY;
-        b.position.x += Math.sin(time + b.position.y) * 0.2;
-        if (b.position.y > 160) b.position.y = -150;
-      });
-
-      // エサ
-      active3DFoods.forEach(food => {
-        if (food.userData.isEaten) return;
-        food.position.y -= food.userData.fallSpeed;
-        food.rotation.x += 0.02;
-        food.rotation.y += 0.02;
-        if (food.position.y < -110) remove3DFood(food);
-      });
-
-      // 3D魚たちの動的アニメーション
-      active3DFishes.forEach(fish => {
-        const data = fish.userData;
-
-        if (data.isLeaving) {
-          fish.position.y += 2.5;
-          fish.position.x += 1.5;
-          fish.rotation.y += 0.1;
-          if (fish.position.y > 300) {
-            scene.remove(fish);
-            const idx = active3DFishes.indexOf(fish);
-            if (idx !== -1) active3DFishes.splice(idx, 1);
-          }
+      const interval = setInterval(() => {
+        if (foodObj.isEaten) {
+          clearInterval(interval);
           return;
         }
 
-        // A. エサ探索
-        if (!data.targetFood && !data.isFull && active3DFoods.length > 0) {
-          let closestFood = null;
-          let minDist = Infinity;
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / fallDuration, 1);
+        foodObj.y = (startY + (targetY - startY) * progress) + 13;
 
-          active3DFoods.forEach(food => {
-            if (food.userData.isEaten) return;
-            if (food.userData.targetedBy && food.userData.targetedBy !== fish) return;
-
-            const dist = fish.position.distanceTo(food.position);
-            if (dist < minDist) {
-              minDist = dist;
-              closestFood = food;
-            }
-          });
-
-          if (closestFood) {
-            data.targetFood = closestFood;
-            closestFood.userData.targetedBy = fish;
-          }
+        if (progress >= 1) {
+          clearInterval(interval);
+          removeFood(foodObj);
         }
-
-        // B. 目標設定
-        if (data.targetFood) {
-          if (data.targetFood.userData.isEaten) {
-            data.targetFood = null;
-          } else {
-            data.targetPos.copy(data.targetFood.position);
-          }
-        } else if (Math.random() < 0.015) {
-          const targetY = (data.type === 'crab') ? -100 : (Math.random() - 0.5) * 180;
-          data.targetPos.set(
-            (Math.random() - 0.5) * 240,
-            targetY,
-            (Math.random() - 0.5) * 60
-          );
-        }
-
-        // C. 3D移動＆ダイナミック旋回（厚みがしっかり見える動き）
-        const dir = new THREE.Vector3().subVectors(data.targetPos, fish.position);
-        const dist = dir.length();
-
-        if (dist > 2) {
-          dir.normalize();
-          fish.position.addScaledVector(dir, data.speed * (data.targetFood ? 1.8 : 1.0));
-
-          // 進行方向（Y軸）の回転
-          const targetAngleY = dir.x > 0 ? 0.3 : Math.PI - 0.3; // 完全に真横でなく少し斜めにして厚みを見せる
-          data.currentAngleY = THREE.MathUtils.lerp(data.currentAngleY, targetAngleY, 0.08);
-          fish.rotation.y = data.currentAngleY;
-
-          // 💡3D感を強調する体全体のひねり（Z軸・X軸回転）
-          fish.rotation.z = Math.sin(time * 3 + data.swimTimeOffset) * 0.15;
-          fish.rotation.x = dir.y * 0.3;
-        }
-
-        // D. 食いつき判定
-        if (data.targetFood) {
-          const hitDist = fish.position.distanceTo(data.targetFood.position);
-          if (hitDist < 25) {
-            const eatenFood = data.targetFood;
-            data.targetFood = null;
-            remove3DFood(eatenFood);
-
-            data.eatenCount++;
-            data.baseScale += 0.12;
-            fish.scale.setScalar(data.baseScale);
-
-            if (data.eatenCount >= data.maxEatCount) {
-              data.isFull = true;
-              show3DEatEffect(fish.position, "🈵 おなかいっぱい！💤");
-            } else {
-              const msgs = ["❤️ ぱくっ！", "✨ モグモグ！", "😋 おいしい！", "🎵 もぐもぐ！"];
-              const msg = msgs[Math.floor(Math.random() * msgs.length)];
-              show3DEatEffect(fish.position, msg);
-            }
-          }
-        }
-      });
-
-      renderer.render(scene, camera);
+      }, 100);
     }
 
-    animate();
+    function removeFood(foodObj) {
+      if (foodObj.isEaten) return;
+      foodObj.isEaten = true;
 
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+      const idx = activeFoods.indexOf(foodObj);
+      if (idx !== -1) activeFoods.splice(idx, 1);
+
+      if (foodObj.element) {
+        foodObj.element.style.opacity = '0';
+        setTimeout(() => foodObj.element.remove(), 300);
+      }
+    }
+
+    function showEatEffect(x, y, text) {
+      const effect = document.createElement('div');
+      effect.className = 'eat-effect';
+      effect.innerText = text;
+      effect.style.left = `${x}px`;
+      effect.style.top = `${y}px`;
+      document.body.appendChild(effect);
+      setTimeout(() => effect.remove(), 1400);
+    }
+
+    function createFloatingArt(dataURL, type, dbRef, remainingLife) {
+      const container = document.createElement('div');
+      container.className = 'art-item';
+
+      const scaler = document.createElement('div');
+      scaler.className = 'art-scaler';
+
+      const img = document.createElement('img');
+      img.src = dataURL;
+
+      let animationClass = 'fish-wiggle';
+      if (type === 'crab') animationClass = 'crab-wiggle';
+      if (type === 'octopus') animationClass = 'octopus-wiggle';
+      img.className = `art-body ${animationClass}`;
+
+      scaler.appendChild(img);
+      container.appendChild(scaler);
+      document.body.appendChild(container);
+
+      img.onload = () => {
+        const baseW = img.offsetWidth || 180;
+        const baseH = img.offsetHeight || 180;
+
+        const getRealPos = () => {
+          const style = window.getComputedStyle(container);
+          const rx = parseFloat(style.left) || 0;
+          const ry = parseFloat(style.top) || 0;
+          const currentW = baseW * currentScale;
+          const currentH = baseH * currentScale;
+          return {
+            x: rx + currentW / 2,
+            y: ry + currentH / 2,
+            left: rx,
+            top: ry
+          };
+        };
+
+        let startX = Math.random() * (window.innerWidth - baseW - 120) + 60;
+        let startY = (type === 'crab') 
+          ? window.innerHeight - baseH - 40 
+          : Math.random() * (window.innerHeight - baseH - 200) + 60;
+
+        container.style.left = `${startX}px`;
+        container.style.top = `${startY}px`;
+
+        let moveTimer = null;
+        let aiInterval = null;
+        let isTargetingFood = false;
+        let currentTargetFood = null;
+        let isLeaving = false;
+
+        let eatenCount = 0;
+        const maxEatCount = 5;
+        let isFull = false;
+        let currentScale = 1.0;
+
+        const creatureObj = { type };
+
+        const updateTransform = (flipX, angle = 0) => {
+          scaler.style.transform = `scaleX(${flipX}) rotate(${angle}deg) scale(${currentScale})`;
+        };
+
+        const moveTo = (tx, ty, isFast = false) => {
+          const realPos = getRealPos();
+          const currentW = baseW * currentScale;
+          const currentH = baseH * currentScale;
+
+          const maxX = Math.max(20, window.innerWidth - currentW - 40);
+          const targetX = Math.min(Math.max(20, tx), maxX);
+
+          const deltaX = targetX - realPos.left;
+          let deltaY = 0;
+          let duration = 0;
+
+          if (type === 'crab') {
+            const targetY = window.innerHeight - currentH - 40;
+            const distance = Math.abs(deltaX);
+            duration = Math.min(Math.max(distance / (isFast ? 240 : 140), 0.8), 4.0);
+
+            container.style.transition = `left ${duration}s ${isFast ? 'ease-in-out' : 'linear'}`;
+            container.style.left = `${targetX}px`;
+            container.style.top = `${targetY}px`;
+          } else {
+            const targetY = Math.min(Math.max(40, ty), window.innerHeight - currentH - 120);
+            deltaY = targetY - realPos.top;
+            const distance = Math.hypot(deltaX, deltaY);
+            duration = Math.min(Math.max(distance / (isFast ? 240 : 140), 0.8), 4.5);
+
+            container.style.transition = `left ${duration}s ${isFast ? 'ease-in-out' : 'linear'}, top ${duration}s ${isFast ? 'ease-in-out' : 'linear'}`;
+            container.style.left = `${targetX}px`;
+            container.style.top = `${targetY}px`;
+          }
+
+          const flipX = deltaX > 0 ? -1 : 1;
+          let angle = (type === 'crab' || type === 'octopus') ? 0 : Math.atan2(deltaY, Math.abs(deltaX)) * (180 / Math.PI) * 0.35;
+          if (flipX === -1 && type === 'fish') angle = -angle;
+
+          updateTransform(flipX, angle);
+
+          return duration * 1000;
+        };
+
+        const targetFood = (foodObj) => {
+          if (isLeaving || isFull || foodObj.isEaten) return;
+
+          if (currentTargetFood && currentTargetFood.targetedBy === creatureObj) {
+            currentTargetFood.targetedBy = null;
+          }
+
+          isTargetingFood = true;
+          currentTargetFood = foodObj;
+          foodObj.targetedBy = creatureObj;
+          clearTimeout(moveTimer);
+
+          moveTo(foodObj.x - (baseW * currentScale) / 2, foodObj.y - (baseH * currentScale) / 2, true);
+        };
+
+        const releaseFoodTarget = () => {
+          if (currentTargetFood && currentTargetFood.targetedBy === creatureObj) {
+            currentTargetFood.targetedBy = null;
+          }
+          isTargetingFood = false;
+          currentTargetFood = null;
+          delete container.dataset.lastTx;
+          delete container.dataset.lastTy;
+        };
+
+        const swim = () => {
+          if (isTargetingFood || isLeaving) return;
+
+          const currentW = baseW * currentScale;
+          const currentH = baseH * currentScale;
+
+          const maxX = Math.max(30, window.innerWidth - currentW - 50);
+          let nextX = Math.min(Math.max(30, Math.random() * maxX), maxX);
+          let nextY;
+
+          if (type === 'crab') {
+            nextY = window.innerHeight - currentH - 40;
+          } else if (type === 'octopus') {
+            nextY = Math.min(Math.max(100, Math.random() * (window.innerHeight - currentH - 100)), window.innerHeight - currentH - 100);
+          } else {
+            nextY = Math.min(Math.max(50, Math.random() * (window.innerHeight - currentH - 140)), window.innerHeight - currentH - 120);
+          }
+
+          const durationMs = moveTo(nextX, nextY, false);
+          const restTime = Math.random() * 1500 + 1000;
+
+          moveTimer = setTimeout(swim, durationMs + restTime);
+        };
+
+        // 🧠 AI処理
+        aiInterval = setInterval(() => {
+          if (isLeaving) {
+            clearInterval(aiInterval);
+            return;
+          }
+
+          const realPos = getRealPos();
+
+          // 1. 未予約のエサを検索
+          if (!isTargetingFood && !isFull && activeFoods.length > 0) {
+            let closestFood = null;
+            let minDistance = Infinity;
+
+            activeFoods.forEach(food => {
+              if (food.isEaten) return;
+              if (food.targetedBy && food.targetedBy !== creatureObj) return;
+
+              const dist = Math.hypot(food.x - realPos.x, food.y - realPos.y);
+              if (dist < minDistance) {
+                minDistance = dist;
+                closestFood = food;
+              }
+            });
+
+            if (closestFood) {
+              targetFood(closestFood);
+            }
+          }
+
+          // 2. 追尾＆パクッと食いつき
+          if (isTargetingFood && currentTargetFood) {
+            if (currentTargetFood.isEaten) {
+              releaseFoodTarget();
+              swim();
+              return;
+            }
+
+            let isHit = false;
+            if (type === 'crab') {
+              const dx = Math.abs(currentTargetFood.x - realPos.x);
+              if (dx < 60 && currentTargetFood.y >= window.innerHeight - 200) {
+                isHit = true;
+              }
+            } else {
+              const dist = Math.hypot(currentTargetFood.x - realPos.x, currentTargetFood.y - realPos.y);
+              if (dist < 60) {
+                isHit = true;
+              }
+            }
+
+            if (isHit) {
+              const eatenFood = currentTargetFood;
+              releaseFoodTarget();
+              removeFood(eatenFood);
+
+              eatenCount++;
+              currentScale += 0.10;
+
+              scaler.style.transform += ` scale(1.15)`;
+              setTimeout(() => {
+                const flipX = (container.style.left.replace('px','') > realPos.left) ? -1 : 1;
+                updateTransform(flipX, 0);
+              }, 200);
+
+              if (eatenCount >= maxEatCount) {
+                isFull = true;
+                showEatEffect(realPos.x, realPos.y - 30, "🈵 おなかいっぱい！💤");
+              } else {
+                const messages = ["❤️ ぱくっ！", "✨ モグモグ！", "😋 おいしい！", "🎵 もぐもぐ！"];
+                const msg = messages[Math.floor(Math.random() * messages.length)];
+                showEatEffect(realPos.x, realPos.y - 30, msg);
+              }
+
+              moveTimer = setTimeout(swim, 600);
+            } else {
+              const targetX = currentTargetFood.x - (baseW * currentScale) / 2;
+              const targetY = currentTargetFood.y - (baseH * currentScale) / 2;
+              
+              const lastX = parseFloat(container.dataset.lastTx || 0);
+              const lastY = parseFloat(container.dataset.lastTy || 0);
+              
+              if (Math.hypot(targetX - lastX, targetY - lastY) > 40) {
+                container.dataset.lastTx = targetX;
+                container.dataset.lastTy = targetY;
+                moveTo(targetX, targetY, true);
+              }
+            }
+          }
+        }, 100);
+
+        activeCreatures.push(creatureObj);
+        setTimeout(swim, 300);
+
+        setTimeout(() => {
+          isLeaving = true;
+          releaseFoodTarget();
+          clearTimeout(moveTimer);
+          clearInterval(aiInterval);
+
+          const idx = activeCreatures.indexOf(creatureObj);
+          if (idx !== -1) activeCreatures.splice(idx, 1);
+
+          container.classList.add('fly-away');
+          container.style.transition = `left 3s ease-in, top 3s ease-in`;
+          container.style.left = `${window.innerWidth + 500}px`;
+          container.style.top = `-500px`;
+
+          setTimeout(() => {
+            container.remove();
+            if (dbRef) remove(dbRef).catch(() => {});
+          }, 3000);
+        }, remainingLife);
+
+        window.addEventListener('resize', () => {
+          if (isLeaving) return;
+          const realPos = getRealPos();
+          const currentW = baseW * currentScale;
+          const currentH = baseH * currentScale;
+          let safeX = Math.min(realPos.left, window.innerWidth - currentW - 20);
+          let safeY = (type === 'crab') 
+            ? window.innerHeight - currentH - 40 
+            : Math.min(realPos.top, window.innerHeight - currentH - 20);
+
+          container.style.left = `${safeX}px`;
+          container.style.top = `${safeY}px`;
+        });
+      };
+    }
   </script>
 </body>
 </html>
