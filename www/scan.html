@@ -205,6 +205,46 @@
     }
     initCamera();
 
+    // 背景色（背景紙の色）を、画像全体の明るさのヒストグラムから推定する。
+    // 角のピクセルを直接見る方式は、枠線がわずかに角にかかるだけで
+    // 推定を大きく誤ってしまい、成功／失敗が撮影ごとにばらつく原因になっていたため、
+    // 画像全体で最も多く出現する明るさ帯を「背景紙の色」とみなす方式に変更。
+    function estimateBackgroundColor(data, width, height) {
+      const BIN_SIZE = 10;
+      const BIN_COUNT = Math.ceil(256 / BIN_SIZE);
+      const counts = new Array(BIN_COUNT).fill(0);
+      const rSum = new Array(BIN_COUNT).fill(0);
+      const gSum = new Array(BIN_COUNT).fill(0);
+      const bSum = new Array(BIN_COUNT).fill(0);
+
+      const step = 4; // 間引いても十分な精度が出るため、負荷軽減のためサンプリング
+      for (let y = 0; y < height; y += step) {
+        for (let x = 0; x < width; x += step) {
+          const idx = (y * width + x) * 4;
+          const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+          const brightness = (r + g + b) / 3;
+          const bin = Math.min(BIN_COUNT - 1, Math.floor(brightness / BIN_SIZE));
+          counts[bin]++;
+          rSum[bin] += r; gSum[bin] += g; bSum[bin] += b;
+        }
+      }
+
+      let bestBin = BIN_COUNT - 1; // 何も見つからない場合は「白紙」を仮定
+      let bestCount = 0;
+      for (let i = 0; i < BIN_COUNT; i++) {
+        if (counts[i] > bestCount) { bestCount = counts[i]; bestBin = i; }
+      }
+
+      if (bestCount === 0) {
+        return { r: 255, g: 255, b: 255 };
+      }
+      return {
+        r: rSum[bestBin] / bestCount,
+        g: gSum[bestBin] / bestCount,
+        b: bSum[bestBin] / bestCount
+      };
+    }
+
     window.startCapture = function() {
       if (!video.videoWidth || !video.videoHeight) return;
       loadingText.innerText = "🔍 イラストを 抽出しているよ...";
@@ -257,18 +297,17 @@
         const imgData = ctx.getImageData(0, 0, cropW, cropH);
         const data = imgData.data;
 
-        // 背景色の自動取得（4隅の平均）
-        const cornerR = (data[0] + data[(cropW - 1) * 4] + data[(cropH - 1) * cropW * 4]) / 3;
-        const cornerG = (data[1] + data[(cropW - 1) * 4 + 1] + data[(cropH - 1) * cropW * 4 + 1]) / 3;
-        const cornerB = (data[2] + data[(cropW - 1) * 4 + 2] + data[(cropH - 1) * cropW * 4 + 2]) / 3;
+        // 背景色（背景紙の色）をヒストグラム方式で推定
+        const bg = estimateBackgroundColor(data, cropW, cropH);
+        const bgR = bg.r, bgG = bg.g, bgB = bg.b;
 
         // ピクセルが「描画物（線・色）」かどうかを判定
         const isContentPixel = (r, g, b) => {
           const brightness = (r + g + b) / 3;
           const colorDiff = Math.max(r, g, b) - Math.min(r, g, b);
-          const diffR = Math.abs(r - cornerR);
-          const diffG = Math.abs(g - cornerG);
-          const diffB = Math.abs(b - cornerB);
+          const diffR = Math.abs(r - bgR);
+          const diffG = Math.abs(g - bgG);
+          const diffB = Math.abs(b - bgB);
 
           const isBlackLine = brightness < 110;
           const isColored = colorDiff > 12;
@@ -340,17 +379,19 @@
         // 黒枠ピクセルを「消去（無効化）」してバケツ液が通れるようにする
         framePixels.forEach(p => {
           const pIdx = p * 4;
-          data[pIdx] = cornerR;
-          data[pIdx + 1] = cornerG;
-          data[pIdx + 2] = cornerB;
+          data[pIdx] = bgR;
+          data[pIdx + 1] = bgG;
+          data[pIdx + 2] = bgB;
         });
 
         // 💡【ステップ2】残ったイラスト描画物を「島」として解析
+        // ※以前は2pxおきの間引き探索だったため、細い線・斜めの線（ヒゲや脚）が
+        //   途切れて検出漏れになることがあった。1pxステップの完全走査に変更。
         const visitedClusters = new Uint8Array(cropW * cropH);
         const clusters = [];
 
-        for (let y = 0; y < cropH; y += 2) {
-          for (let x = 0; x < cropW; x += 2) {
+        for (let y = 0; y < cropH; y++) {
+          for (let x = 0; x < cropW; x++) {
             const startIdx = y * cropW + x;
             const pIdx = startIdx * 4;
 
@@ -371,10 +412,10 @@
                 if (cy < cMinY) cMinY = cy; if (cy > cMaxY) cMaxY = cy;
 
                 const neighbors = [
-                  cy > 1 ? curr - cropW * 2 : -1,
-                  cy < cropH - 2 ? curr + cropW * 2 : -1,
-                  cx > 1 ? curr - 2 : -1,
-                  cx < cropW - 2 ? curr + 2 : -1
+                  cy > 0 ? curr - cropW : -1,
+                  cy < cropH - 1 ? curr + cropW : -1,
+                  cx > 0 ? curr - 1 : -1,
+                  cx < cropW - 1 ? curr + 1 : -1
                 ];
 
                 for (const n of neighbors) {
@@ -388,7 +429,8 @@
                 }
               }
 
-              if (clusterPixels.length > 20) {
+              // 1pxステップ化で密度が上がった分、ノイズ除去の基準も合わせて調整
+              if (clusterPixels.length > 60) {
                 clusters.push({
                   pixels: clusterPixels,
                   minX: cMinX, maxX: cMaxX, minY: cMinY, maxY: cMaxY,
@@ -426,11 +468,17 @@
         };
 
         const wallMask = new Uint8Array(cropW * cropH);
-        
+
+        // 固定60pxだと、撮影距離やズームによってヒゲ・脚などの
+        // 本体から自然に離れているパーツが誤って「ゴミ」判定され消えることがあった。
+        // メイン生き物自身のサイズに応じて許容距離を可変にする。
+        const mainW = mainBB.maxX - mainBB.minX;
+        const mainH = mainBB.maxY - mainBB.minY;
+        const nearThreshold = Math.max(mainW, mainH, 40) * 0.5;
+
         clusters.forEach(c => {
-          // メイン生き物から60px以上離れている島は無関係の写り込み（影など）として切り捨てる！
-          const isNearMain = !(c.maxX < mainBB.minX - 60 || c.minX > mainBB.maxX + 60 ||
-                               c.maxY < mainBB.minY - 60 || c.minY > mainBB.maxY + 60);
+          const isNearMain = !(c.maxX < mainBB.minX - nearThreshold || c.minX > mainBB.maxX + nearThreshold ||
+                               c.maxY < mainBB.minY - nearThreshold || c.minY > mainBB.maxY + nearThreshold);
 
           if (c === mainCreature || isNearMain) {
             c.pixels.forEach(p => wallMask[p] = 1);
