@@ -374,7 +374,7 @@
                   cy > 1 ? curr - cropW * 2 : -1,
                   cy < cropH - 2 ? curr + cropW * 2 : -1,
                   cx > 1 ? curr - 2 : -1,
-                  cx < cropW - 2 ? cropW - 2 : -1
+                  cx < cropW - 2 ? curr + 2 : -1
                 ];
 
                 for (const n of neighbors) {
